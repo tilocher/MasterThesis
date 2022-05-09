@@ -16,8 +16,8 @@ from Filters.KalmanFilter_test import KFTest
 from Filters.RTS_Smoother_test import S_Test
 
 if torch.cuda.is_available():
-   dev = torch.device("cuda:0")  # you can continue going on here, like cuda:1 cuda:2....etc.
-   torch.set_default_tensor_type('torch.cuda.FloatTensor')
+   #dev = torch.device("cuda:0")  # you can continue going on here, like cuda:1 cuda:2....etc.
+   #torch.set_default_tensor_type('torch.cuda.FloatTensor')
    print("Running on the GPU")
 else:
    dev = torch.device("cpu")

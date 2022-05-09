@@ -3,12 +3,14 @@ import math
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
+torch.cuda.is_available = lambda : False
 if torch.cuda.is_available():
    dev = torch.device("cuda:0")  # you can continue going on here, like cuda:1 cuda:2....etc.
-   torch.set_default_tensor_type('torch.cuda.FloatTensor')
+   #torch.set_default_tensor_type('torch.cuda.FloatTensor')
 else:
    dev = torch.device("cpu")
    print("Running on the CPU")
+torch.set_default_tensor_type(torch.DoubleTensor)
 
 
 #######################

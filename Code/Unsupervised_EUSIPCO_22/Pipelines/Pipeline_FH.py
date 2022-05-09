@@ -3,16 +3,8 @@ import torch.nn as nn
 import random
 from Plot import Plot
 import time
-
-if torch.cuda.is_available():
-    dev = torch.device("cuda:0")
-    torch.set_default_tensor_type("torch.cuda.FloatTensor")
-    print("using GPU!")
-else:
-    dev = torch.device("cpu")
-    print("using CPU!")
-
-class Pipeline_EKF:
+dev = torch.device('cpu')
+class Pipeline_FH:
 
     def __init__(self, Time, folderName, modelName):
         super().__init__()
@@ -33,9 +25,9 @@ class Pipeline_EKF:
 
     def setTrainingParams(self, n_Epochs, n_Batch, learningRate, weightDecay):
         self.N_Epochs = n_Epochs  # Number of Training Epochs
-        self.N_B = n_Batch # Number of Samples in Batch
-        self.learningRate = learningRate # Learning Rate
-        self.weightDecay = weightDecay # L2 Weight Regularization - Weight Decay
+        self.N_B = n_Batch  # Number of Samples in Batch
+        self.learningRate = learningRate  # Learning Rate
+        self.weightDecay = weightDecay  # L2 Weight Regularization - Weight Decay
 
         # MSE LOSS Function
         self.loss_fn = nn.MSELoss(reduction='mean')
@@ -46,8 +38,8 @@ class Pipeline_EKF:
         # optimizer which Tensors it should update.
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learningRate, weight_decay=self.weightDecay)
 
-
-    def NNTrain(self, SysModel, cv_input, cv_target, train_input, train_target, path_results, nclt=False, sequential_training=False, rnn=False, epochs=None, train_IC=None, CV_IC=None):
+    def NNTrain(self, SysModel, cv_input, cv_target, train_input, train_target, path_results, nclt=False,
+                sequential_training=False, rnn=False, epochs=None, train_IC=None, CV_IC=None):
 
         N_E = train_input.size()[0]
         N_CV = cv_input.size()[0]
@@ -59,7 +51,6 @@ class Pipeline_EKF:
         MSE_train_linear_batch = torch.empty([self.N_B]).to(dev, non_blocking=True)
         self.MSE_train_linear_epoch = torch.empty([self.N_Epochs]).to(dev, non_blocking=True)
         self.MSE_train_dB_epoch = torch.empty([self.N_Epochs]).to(dev, non_blocking=True)
-
 
         ##############
         ### Epochs ###
@@ -85,11 +76,11 @@ class Pipeline_EKF:
             for j in range(0, N_CV):
                 self.model.i = 0
                 # Initialize next sequence
-                if(sequential_training):
-                    if(nclt):
-                        init_conditions = torch.reshape(cv_input[j,:,0], SysModel.m1x_0.shape)
+                if (sequential_training):
+                    if (nclt):
+                        init_conditions = torch.reshape(cv_input[j, :, 0], SysModel.m1x_0.shape)
                     elif CV_IC is None:
-                        init_conditions = torch.reshape(cv_target[j,:,0], SysModel.m1x_0.shape)
+                        init_conditions = torch.reshape(cv_target[j, :, 0], SysModel.m1x_0.shape)
                     else:
                         init_conditions = SysModel.m1x_0
                 else:
@@ -102,15 +93,14 @@ class Pipeline_EKF:
                 x_Net_cv = torch.empty(SysModel.m, SysModel.T).to(dev, non_blocking=True)
 
                 for t in range(0, SysModel.T):
-                    x_Net_cv[:,t] = self.model(y_cv[:,t])
-                
+                    x_Net_cv[:, t] = self.model(y_cv[:, t])
 
                 # Compute Training Loss
-                if(nclt):
-                    if x_Net_cv.size()[0]==6:
-                        mask = torch.tensor([True,False,False,True,False,False])
+                if (nclt):
+                    if x_Net_cv.size()[0] == 6:
+                        mask = torch.tensor([True, False, False, True, False, False])
                     else:
-                        mask = torch.tensor([True,False,True,False])
+                        mask = torch.tensor([True, False, True, False])
                     MSE_cv_linear_batch[j] = self.loss_fn(x_Net_cv[mask], cv_target[j, :, :]).item()
                 else:
                     MSE_cv_linear_batch[j] = self.loss_fn(x_Net_cv, cv_target[j, :, :]).item()
@@ -119,11 +109,11 @@ class Pipeline_EKF:
             self.MSE_cv_linear_epoch[ti] = torch.mean(MSE_cv_linear_batch)
             self.MSE_cv_dB_epoch[ti] = 10 * torch.log10(self.MSE_cv_linear_epoch[ti])
 
-            if(self.MSE_cv_dB_epoch[ti] < MSE_cv_dB_opt):
+            if (self.MSE_cv_dB_epoch[ti] < MSE_cv_dB_opt):
 
                 MSE_cv_dB_opt = self.MSE_cv_dB_epoch[ti]
                 MSE_cv_idx_opt = ti
-                if(rnn):
+                if (rnn):
                     torch.save(self.model, path_results + 'best-model_rnn.pt')
                 else:
                     torch.save(self.model, path_results + 'best-model.pt')
@@ -146,32 +136,30 @@ class Pipeline_EKF:
 
                 y_training = train_input[n_e, :, :]
 
-                if(sequential_training):
-                    if(nclt):
-                        init_conditions = torch.reshape(cv_input[j,:,0], SysModel.m1x_0.shape)
+                if (sequential_training):
+                    if (nclt):
+                        init_conditions = torch.reshape(cv_input[j, :, 0], SysModel.m1x_0.shape)
                     elif CV_IC is None:
-                        init_conditions = torch.reshape(cv_target[j,:,0], SysModel.m1x_0.shape)
+                        init_conditions = torch.reshape(cv_target[j, :, 0], SysModel.m1x_0.shape)
                     else:
                         init_conditions = SysModel.m1x_0
                 else:
                     init_conditions = SysModel.m1x_0
 
-
                 self.model.InitSequence(init_conditions, SysModel.m2x_0, SysModel.T)
-                
 
                 x_Net_training = torch.empty(SysModel.m, SysModel.T).to(dev, non_blocking=True)
-                
+
                 for t in range(0, SysModel.T):
-                    x_Net_training[:,t] = self.model(y_training[:,t])
+                    x_Net_training[:, t] = self.model(y_training[:, t])
 
                 # Compute Training Loss
-                #LOSS = loss_fn(x_Net_training, train_target[n_e, :, :])
-                if(nclt):
-                    if x_Net_training.size()[0]==6:
-                        mask = torch.tensor([True,False,False,True,False,False])
+                # LOSS = loss_fn(x_Net_training, train_target[n_e, :, :])
+                if (nclt):
+                    if x_Net_training.size()[0] == 6:
+                        mask = torch.tensor([True, False, False, True, False, False])
                     else:
-                        mask = torch.tensor([True,False,True,False])
+                        mask = torch.tensor([True, False, True, False])
                     LOSS = self.loss_fn(x_Net_training[mask], train_target[n_e, :, :])
                 else:
                     LOSS = self.loss_fn(x_Net_training, train_target[n_e, :, :])
@@ -179,9 +167,7 @@ class Pipeline_EKF:
                 MSE_train_linear_batch[j] = LOSS.item()
 
                 Batch_Optimizing_LOSS_sum = Batch_Optimizing_LOSS_sum + LOSS
-                #print(x_Net_training)
-
-
+                # print(x_Net_training)
 
             # Average
             self.MSE_train_linear_epoch[ti] = torch.mean(MSE_train_linear_batch)
@@ -198,14 +184,12 @@ class Pipeline_EKF:
             # is called. Checkout docs of torch.autograd.backward for more details.
             self.optimizer.zero_grad()
 
-
             # Backward pass: compute gradient of the loss with respect to model
             # parameters
             Batch_Optimizing_LOSS_mean = Batch_Optimizing_LOSS_sum / self.N_B
             Batch_Optimizing_LOSS_mean.backward(retain_graph=True)
 
-            #torch.nn.utils.clip_grad_norm_(Model.parameters(), max_norm=2.0, norm_type=2)
-
+            # torch.nn.utils.clip_grad_norm_(Model.parameters(), max_norm=2.0, norm_type=2)
 
             # Calling the step function on an Optimizer makes an update to its
             # parameters
@@ -214,11 +198,12 @@ class Pipeline_EKF:
             ########################
             ### Training Summary ###
             ########################
-            print(ti, "MSE Training :", self.MSE_train_dB_epoch[ti], "[dB]", "MSE Validation :", self.MSE_cv_dB_epoch[ti], "[dB]")
+            print(ti, "MSE Training :", self.MSE_train_dB_epoch[ti], "[dB]", "MSE Validation :",
+                  self.MSE_cv_dB_epoch[ti], "[dB]")
 
             if (ti > 1):
                 d_train = self.MSE_train_dB_epoch[ti] - self.MSE_train_dB_epoch[ti - 1]
-                d_cv    = self.MSE_cv_dB_epoch[ti] - self.MSE_cv_dB_epoch[ti - 1]
+                d_cv = self.MSE_cv_dB_epoch[ti] - self.MSE_cv_dB_epoch[ti - 1]
                 print("diff MSE Training :", d_train, "[dB]", "diff MSE Validation :", d_cv, "[dB]")
 
             print("Optimal idx:", MSE_cv_idx_opt, "Optimal :", MSE_cv_dB_opt, "[dB]")
@@ -233,17 +218,17 @@ class Pipeline_EKF:
         # MSE LOSS Function
         loss_fn = nn.MSELoss(reduction='mean')
 
-        if(rnn):
-            Model = torch.load(path_results+'best-model_rnn.pt', map_location=dev)
+        if (rnn):
+            Model = torch.load(path_results + 'best-model_rnn.pt', map_location=dev)
         else:
-            Model = torch.load(path_results+'best-model.pt', map_location=dev)
+            Model = torch.load(path_results + 'best-model.pt', map_location=dev)
 
         Model.eval()
         torch.no_grad()
 
         self.KGain_array = torch.zeros((SysModel.T_test, Model.m, Model.n))
-        self.x_out_array = torch.empty(N_T,SysModel.m, SysModel.T_test)
-        
+        self.x_out_array = torch.empty(N_T, SysModel.m, SysModel.T_test)
+
         start = time.time()
         for j in range(0, N_T):
             Model.i = 0
@@ -256,23 +241,22 @@ class Pipeline_EKF:
                 init_cond = torch.reshape(IC[j, :], SysModel.m1x_0.shape)
                 Model.InitSequence(init_cond, SysModel.m2x_0, SysModel.T_test)
 
-            
             y_mdl_tst = test_input[j, :, :]
 
             x_Net_mdl_tst = torch.empty(SysModel.m, SysModel.T_test).to(dev, non_blocking=True)
-            
+
             for t in range(0, SysModel.T_test):
-                x_Net_mdl_tst[:,t] = Model(y_mdl_tst[:,t])
-            
-            if(nclt):
+                x_Net_mdl_tst[:, t] = Model(y_mdl_tst[:, t])
+
+            if (nclt):
                 if x_Net_mdl_tst.size()[0] == 6:
-                    mask = torch.tensor([True,False,False,True,False,False])
+                    mask = torch.tensor([True, False, False, True, False, False])
                 else:
-                    mask = torch.tensor([True,False,True,False])
+                    mask = torch.tensor([True, False, True, False])
                 self.MSE_test_linear_arr[j] = loss_fn(x_Net_mdl_tst[mask], test_target[j, :, :]).item()
             else:
                 self.MSE_test_linear_arr[j] = loss_fn(x_Net_mdl_tst, test_target[j, :, :]).item()
-            self.x_out_array[j,:,:] = x_Net_mdl_tst
+            self.x_out_array[j, :, :] = x_Net_mdl_tst
 
             try:
                 self.KGain_array = torch.add(Model.KGain_array, self.KGain_array)
@@ -293,17 +277,18 @@ class Pipeline_EKF:
         # Print Run Time
         print("Inference Time:", t)
 
-        return [self.MSE_test_linear_arr, self.MSE_test_linear_avg, self.MSE_test_dB_avg, self.KGain_array, self.x_out_array, t]
+        return [self.MSE_test_linear_arr, self.MSE_test_linear_avg, self.MSE_test_dB_avg, self.KGain_array,
+                self.x_out_array, t]
 
     def NNTest_evol(self, SysModel, test_input, test_target, path_results):
 
         N_T = test_input.size()[0]
-        MSE_test_linear_arr = torch.empty(N_T,SysModel.m, SysModel.T_test)
+        MSE_test_linear_arr = torch.empty(N_T, SysModel.m, SysModel.T_test)
 
         # MSE LOSS Function
         loss_fn = nn.MSELoss(reduction='none')
 
-        Model = torch.load(path_results+'best-model.pt', map_location=dev)
+        Model = torch.load(path_results + 'best-model.pt', map_location=dev)
 
         Model.eval()
         torch.no_grad()
@@ -313,31 +298,32 @@ class Pipeline_EKF:
         for j in range(0, N_T):
             Model.i = 0
             # Unrolling Forward Pass
-            
+
             Model.InitSequence(torch.unsqueeze(test_target[j, :, 0], dim=1), SysModel.m2x_0, SysModel.T_test)
-                      
+
             y_mdl_tst = test_input[j, :, :]
 
             x_Net_mdl_tst = torch.empty(SysModel.m, SysModel.T_test).to(dev, non_blocking=True)
-            
+
             for t in range(0, SysModel.T_test):
-                x_Net_mdl_tst[:,t] = Model(y_mdl_tst[:,t])
-                     
+                x_Net_mdl_tst[:, t] = Model(y_mdl_tst[:, t])
+
             MSE_test_linear_arr[j, :, :] = loss_fn(x_Net_mdl_tst, test_target[j, :, :])
 
         # Average
-        MSE_test_avg = torch.mean(MSE_test_linear_arr, [0,1])
+        MSE_test_avg = torch.mean(MSE_test_linear_arr, [0, 1])
 
         for j in range(0, SysModel.T_test):
-            error_covariance = torch.mm((torch.mm((torch.eye(SysModel.m) - Model.KGain_array[j,:,:]),Model.KGain_array[j,:,:])),torch.inverse(torch.eye(SysModel.m) - Model.KGain_array[j,:,:]))
+            error_covariance = torch.mm(
+                (torch.mm((torch.eye(SysModel.m) - Model.KGain_array[j, :, :]), Model.KGain_array[j, :, :])),
+                torch.inverse(torch.eye(SysModel.m) - Model.KGain_array[j, :, :]))
             cov_trace = torch.trace(error_covariance)
             trace_avg[j] = cov_trace
 
         self.MSE_test_dB_avg = 10 * torch.log10(MSE_test_avg)
-        self.trace_dB_avg = 10* torch.log10(trace_avg)
+        self.trace_dB_avg = 10 * torch.log10(trace_avg)
 
         return [self.MSE_test_dB_avg, self.trace_dB_avg]
-
 
     def PlotTrain_KF(self, MSE_KF_linear_arr, MSE_KF_dB_avg):
 

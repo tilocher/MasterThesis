@@ -77,7 +77,7 @@ class SystemModel:
     def UpdateCovariance_Gain(self, q, r):
 
         self.q = q
-        self.Q = q * q * torch.eye(self.m)
+        self.Q = q * q * torch.eye(self.m).to(torch.device('cpu'))
 
         self.r = r
         self.R = r * r * torch.eye(self.n)
