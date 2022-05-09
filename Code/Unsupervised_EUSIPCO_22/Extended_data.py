@@ -10,6 +10,7 @@ else:
    dev = torch.device("cpu")
    print("Running on the CPU")
 
+
 #######################
 ### Size of DataSet ###
 #######################

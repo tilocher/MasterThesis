@@ -3,20 +3,20 @@ import torch
 torch.pi = torch.acos(torch.zeros(1)).item() * 2 # which is 3.1415927410125732
 import pickle
 import torch.nn as nn
-import EKF_test
-from Extended_RTS_Smoother_test import S_Test
-from Extended_sysmdl import SystemModel
+import Filters.EKF_test
+from Filters.Extended_RTS_Smoother_test import S_Test
+from SystemModels.Extended_sysmdl import SystemModel
 from Extended_data import DataGen,DataLoader,DataLoader_GPU, Decimate_and_perturbate_Data,Short_Traj_Split
 from Extended_data import N_E, N_CV, N_T
-from Pipeline_EKF import Pipeline_EKF
-from Pipeline_ERTS import Pipeline_ERTS as Pipeline
+from Pipelines.Pipeline_EKF import Pipeline_EKF
+from Pipelines.Pipeline_ERTS import Pipeline_ERTS as Pipeline
 
-from KalmanNet_nn import KalmanNetNN
-from RTSNet_nn import RTSNetNN
+from NeuraNets.KalmanNet_nn import KalmanNetNN
+from NeuraNets.RTSNet_nn import RTSNetNN
 
 # from PF_test import PFTest
 
-from Plot import Plot_extended as Plot
+from Pipelines.Plot import Plot_extended as Plot
 
 from datetime import datetime
 

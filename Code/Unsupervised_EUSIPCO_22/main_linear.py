@@ -1,20 +1,19 @@
 import os
 
 import torch
+
 torch.pi = torch.acos(torch.zeros(1)).item() * 2 # which is 3.1415927410125732
-import torch.nn as nn
-from Linear_sysmdl import SystemModel
-from Extended_data import DataGen,DataLoader,DataLoader_GPU, Decimate_and_perturbate_Data,Short_Traj_Split
-from Extended_data import N_E, N_CV, N_T, F, H, F_rotated, H_rotated, T, T_test, m1_0, m2_0, m, n
-from Pipeline_ERTS import Pipeline_ERTS as Pipeline
+from SystemModels.Linear_sysmdl import SystemModel
+from Extended_data import DataGen, DataLoader_GPU
+from filing_paths import BaseFolder
+from Extended_data import F, H, H_rotated, T, T_test, m1_0, m2_0, m, n
+from Pipelines.Pipeline_ERTS import Pipeline_ERTS as Pipeline
 
 from datetime import datetime
-from RTSNet_nn import RTSNetNN
+from NeuraNets.RTSNet_nn import RTSNetNN
 
-from KalmanFilter_test import KFTest
-from RTS_Smoother_test import S_Test
-
-from Plot import Plot_RTS as Plot
+from Filters.KalmanFilter_test import KFTest
+from Filters.RTS_Smoother_test import S_Test
 
 if torch.cuda.is_available():
    dev = torch.device("cuda:0")  # you can continue going on here, like cuda:1 cuda:2....etc.
@@ -63,9 +62,10 @@ sys_model_partialh.InitSequence(m1_0, m2_0)
 ###################################
 ### Data Loader (Generate Data) ###
 ###################################
-dataFolderName = 'Simulations/Linear_canonical' + '/'
+dataFolderName = r'' + BaseFolder +  '\\Simulations\\Linear_canonical' + '\\'
 dataFileName = '{}x{}_rq{}{}_T{}.pt'.format(m,n,r_dB,(r_dB + vdB),T)
 print("Start Data Gen")
+
 if not dataFileName in os.listdir(dataFolderName):
    DataGen(sys_model, dataFolderName + dataFileName, T, T_test,randomInit=False)
 print("Data Load")
