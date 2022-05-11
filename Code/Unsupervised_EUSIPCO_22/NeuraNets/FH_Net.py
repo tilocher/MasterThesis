@@ -2,8 +2,10 @@ import filing_paths
 import torch
 import torch.nn as nn
 import torch.nn.functional as func
+from blitz.modules import BayesianLinear
+from blitz.utils import variational_estimator
 
-
+@variational_estimator
 class FH_Net(nn.Module):
 
     def __init__(self):
@@ -11,11 +13,11 @@ class FH_Net(nn.Module):
 
     def Build(self,m,n):
 
-        self.l1 = nn.Linear(n,10)
-        self.l2 = nn.Linear(10,30)
-        self.out = nn.Linear(30,m)
+        self.l1 = BayesianLinear(n,10)
+        self.l2 = BayesianLinear(10,100)
+        self.out = BayesianLinear(100,m+n)
 
-        self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU(0.01)
 
     def forward(self,x):
         x = self.relu(self.l1(x))

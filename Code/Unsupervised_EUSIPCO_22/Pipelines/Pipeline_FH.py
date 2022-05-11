@@ -3,7 +3,16 @@ import torch.nn as nn
 import random
 from Plot import Plot
 import time
-dev = torch.device('cpu')
+
+if torch.cuda.is_available():
+    dev = torch.device("cuda:0")
+    torch.set_default_tensor_type("torch.cuda.FloatTensor")
+    print("using GPU!")
+else:
+    dev = torch.device("cpu")
+    print("using CPU!")
+
+
 class Pipeline_FH:
 
     def __init__(self, Time, folderName, modelName):
@@ -39,7 +48,7 @@ class Pipeline_FH:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learningRate, weight_decay=self.weightDecay)
 
     def NNTrain(self, SysModel, cv_input, cv_target, train_input, train_target, path_results, nclt=False,
-                sequential_training=False, rnn=False, epochs=None, train_IC=None, CV_IC=None):
+                sequential_training=False, rnn=False, epochs=None, train_IC=None, CV_IC=None, variational = True, samples = 10):
 
         N_E = train_input.size()[0]
         N_CV = cv_input.size()[0]
@@ -93,7 +102,7 @@ class Pipeline_FH:
                 x_Net_cv = torch.empty(SysModel.m, SysModel.T).to(dev, non_blocking=True)
 
                 for t in range(0, SysModel.T):
-                    x_Net_cv[:, t] = self.model(y_cv[:, t])
+                    x_Net_cv[:, t] = self.model(y_cv[:, t])[:SysModel.m]
 
                 # Compute Training Loss
                 if (nclt):
@@ -148,10 +157,14 @@ class Pipeline_FH:
 
                 self.model.InitSequence(init_conditions, SysModel.m2x_0, SysModel.T)
 
-                x_Net_training = torch.empty(SysModel.m, SysModel.T).to(dev, non_blocking=True)
+                x_Net_training = torch.empty(SysModel.m + SysModel.n, SysModel.T,samples).to(dev, non_blocking=True)
 
                 for t in range(0, SysModel.T):
-                    x_Net_training[:, t] = self.model(y_training[:, t])
+                    for n in range(samples):
+                        if t == 0:
+                            x_Net_training[:, t, n] = self.model(self.ssModel.m1x_0.T)
+                        else:
+                            x_Net_training[:, t, n] = self.model(x_Net_training[:SysModel.m,t-1,:].mean(-1))
 
                 # Compute Training Loss
                 # LOSS = loss_fn(x_Net_training, train_target[n_e, :, :])
@@ -162,7 +175,10 @@ class Pipeline_FH:
                         mask = torch.tensor([True, False, True, False])
                     LOSS = self.loss_fn(x_Net_training[mask], train_target[n_e, :, :])
                 else:
-                    LOSS = self.loss_fn(x_Net_training, train_target[n_e, :, :])
+                    target = train_input[n_e,:,:].unsqueeze(-1).expand(-1,-1,samples)
+                    LOSS = self.loss_fn(x_Net_training[self.ssModel.m:], target)/samples + self.model.nn_kl_divergence()/samples
+                    # LOSS = self.loss_fn(x_Net_training, train_target[n_e, :, :])
+                    # LOSS = self.loss_fn()
 
                 MSE_train_linear_batch[j] = LOSS.item()
 
@@ -206,7 +222,7 @@ class Pipeline_FH:
                 d_cv = self.MSE_cv_dB_epoch[ti] - self.MSE_cv_dB_epoch[ti - 1]
                 print("diff MSE Training :", d_train, "[dB]", "diff MSE Validation :", d_cv, "[dB]")
 
-            print("Optimal idx:", MSE_cv_idx_opt, "Optimal :", MSE_cv_dB_opt, "[dB]")
+            print("Optimal idx:", MSE_cv_idx_opt, "Optimal :", MSE_cv_dB_opt.item(), "[dB]")
 
         return [self.MSE_cv_linear_epoch, self.MSE_cv_dB_epoch, self.MSE_train_linear_epoch, self.MSE_train_dB_epoch]
 
@@ -226,8 +242,8 @@ class Pipeline_FH:
         Model.eval()
         torch.no_grad()
 
-        self.KGain_array = torch.zeros((SysModel.T_test, Model.m, Model.n))
-        self.x_out_array = torch.empty(N_T, SysModel.m, SysModel.T_test)
+        # self.KGain_array = torch.zeros((SysModel.T_test, Model.m, Model.n))
+        # self.x_out_array = torch.empty(N_T, SysModel.m, SysModel.T_test)
 
         start = time.time()
         for j in range(0, N_T):
@@ -302,23 +318,24 @@ class Pipeline_FH:
             Model.InitSequence(torch.unsqueeze(test_target[j, :, 0], dim=1), SysModel.m2x_0, SysModel.T_test)
 
             y_mdl_tst = test_input[j, :, :]
+            samples = 10
 
-            x_Net_mdl_tst = torch.empty(SysModel.m, SysModel.T_test).to(dev, non_blocking=True)
-
+            x_Net_mdl_tst = torch.empty(SysModel.m + SysModel.n, SysModel.T_test,samples).to(dev, non_blocking=True)
             for t in range(0, SysModel.T_test):
-                x_Net_mdl_tst[:, t] = Model(y_mdl_tst[:, t])
+                for n in range(samples):
+                    x_Net_mdl_tst[:, t,n] = Model(y_mdl_tst[:, t])
 
-            MSE_test_linear_arr[j, :, :] = loss_fn(x_Net_mdl_tst, test_target[j, :, :])
+            MSE_test_linear_arr[j, :, :] = loss_fn(x_Net_mdl_tst[:self.ssModel.m].mean(-1), test_target[j, :, :])
 
         # Average
         MSE_test_avg = torch.mean(MSE_test_linear_arr, [0, 1])
 
-        for j in range(0, SysModel.T_test):
-            error_covariance = torch.mm(
-                (torch.mm((torch.eye(SysModel.m) - Model.KGain_array[j, :, :]), Model.KGain_array[j, :, :])),
-                torch.inverse(torch.eye(SysModel.m) - Model.KGain_array[j, :, :]))
-            cov_trace = torch.trace(error_covariance)
-            trace_avg[j] = cov_trace
+        # for j in range(0, SysModel.T_test):
+        #     error_covariance = torch.mm(
+        #         (torch.mm((torch.eye(SysModel.m) - Model.KGain_array[j, :, :]), Model.KGain_array[j, :, :])),
+        #         torch.inverse(torch.eye(SysModel.m) - Model.KGain_array[j, :, :]))
+        #     cov_trace = torch.trace(error_covariance)
+        #     trace_avg[j] = cov_trace
 
         self.MSE_test_dB_avg = 10 * torch.log10(MSE_test_avg)
         self.trace_dB_avg = 10 * torch.log10(trace_avg)

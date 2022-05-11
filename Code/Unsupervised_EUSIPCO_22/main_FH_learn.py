@@ -17,13 +17,13 @@ from NeuraNets.FH_Net import FH_Net
 from datetime import datetime
 from Pipelines.Pipeline_FH import Pipeline_FH
 
-# if torch.cuda.is_available():
-#     dev = torch.device("cuda:0")  # you can continue going on here, like cuda:1 cuda:2....etc.
-#     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-#     print("Running on the GPU")
-#
-# else:
-#dev = torch.device("cpu")
+if torch.cuda.is_available():
+    dev = torch.device("cuda:0")  # you can continue going on here, like cuda:1 cuda:2....etc.
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    print("Running on the GPU")
+
+else:
+    dev = torch.device("cpu")
 print("Running on the CPU")
 
 print("Pipeline Start")
@@ -98,6 +98,7 @@ Pipeline.setModel(model)
 Pipeline.setssModel(sys_model)
 Pipeline.setTrainingParams(10,20,1e-3,1e-6)
 Pipeline.NNTrain(sys_model,cv_input,cv_target,train_input,train_target,path_results)
+Pipeline.NNTest_evol(sys_model,test_input,test_target,path_results)
 
 
 
