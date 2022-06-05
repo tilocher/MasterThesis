@@ -2,16 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="d12d40bb-4d32-4d02-a40d-1fa34b7862aa" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/NeuraNets/ECG_Net.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/ECG_model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_ECG.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/MasterThesis.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/MasterThesis.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/ARIMA.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/main.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines/Pipeline_ECGModel.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Extended_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Extended_data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/NeuraNets/FH_Net.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/NeuraNets/FH_Net.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines/Pipeline_FH.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines/Pipeline_FH.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_FH_learn.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_FH_learn.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/NeuraNets/ECG_Net.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/NeuraNets/ECG_Net.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/ECG_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/ECG_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_ECG.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_ECG.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,7 +42,95 @@
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
-  <component name="RunManager" selected="Python.main_ECG">
+  <component name="RunManager" selected="Python.ARIMA">
+    <configuration name="ARIMA" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/ARIMA.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="PartialECGModel" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/PartialECGModel.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Pipeline_ECGModel" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines/Pipeline_ECGModel.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="main_ARMA" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_ARMA.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="main_ECG" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="MasterThesis" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -93,11 +178,18 @@
     <list>
       <item itemvalue="Python.main_FH_learn" />
       <item itemvalue="Python.main_ECG" />
+      <item itemvalue="Python.PartialECGModel" />
+      <item itemvalue="Python.Pipeline_ECGModel" />
+      <item itemvalue="Python.main_ARMA" />
+      <item itemvalue="Python.ARIMA" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.ARIMA" />
+        <item itemvalue="Python.main_ARMA" />
+        <item itemvalue="Python.Pipeline_ECGModel" />
+        <item itemvalue="Python.PartialECGModel" />
         <item itemvalue="Python.main_ECG" />
-        <item itemvalue="Python.main_FH_learn" />
       </list>
     </recent_temporary>
   </component>
@@ -115,7 +207,19 @@
       <workItem from="1652166238298" duration="4458000" />
       <workItem from="1652187035403" duration="3389000" />
       <workItem from="1652212657111" duration="1604000" />
-      <workItem from="1652257289092" duration="13986000" />
+      <workItem from="1652257289092" duration="14038000" />
+      <workItem from="1652339815001" duration="9508000" />
+      <workItem from="1652361966801" duration="9836000" />
+      <workItem from="1652437814591" duration="2457000" />
+      <workItem from="1652550788863" duration="597000" />
+      <workItem from="1653148229085" duration="110000" />
+      <workItem from="1653479906818" duration="11557000" />
+      <workItem from="1653811661399" duration="18012000" />
+      <workItem from="1653990613525" duration="459000" />
+      <workItem from="1654001756081" duration="3694000" />
+      <workItem from="1654244575903" duration="1561000" />
+      <workItem from="1654336411106" duration="16892000" />
+      <workItem from="1654422543805" duration="3770000" />
     </task>
     <servers />
   </component>
@@ -147,22 +251,94 @@
           <option name="timeStamp" value="9" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/NeuraNets/ECG_Net.py</url>
-          <line>72</line>
-          <option name="timeStamp" value="26" />
+          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/ECG_model.py</url>
+          <line>145</line>
+          <option name="timeStamp" value="77" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_ECG.py</url>
-          <line>54</line>
-          <option name="timeStamp" value="30" />
+          <line>47</line>
+          <option name="timeStamp" value="78" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/ECG_model.py</url>
+          <line>133</line>
+          <option name="timeStamp" value="82" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/ECG_model.py</url>
+          <line>165</line>
+          <option name="timeStamp" value="83" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/PartialECGModel.py</url>
+          <line>175</line>
+          <option name="timeStamp" value="99" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/PartialECGModel.py</url>
+          <line>158</line>
+          <option name="timeStamp" value="105" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_ARMA.py</url>
+          <line>36</line>
+          <option name="timeStamp" value="106" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_ARMA.py</url>
+          <line>34</line>
+          <option name="timeStamp" value="108" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/main_ARMA.py</url>
+          <line>22</line>
+          <option name="timeStamp" value="109" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/ARIMA.py</url>
+          <line>218</line>
+          <option name="timeStamp" value="157" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/ARIMA.py</url>
+          <line>181</line>
+          <option name="timeStamp" value="158" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/ARIMA.py</url>
+          <line>159</line>
+          <option name="timeStamp" value="159" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/ARIMA.py</url>
+          <line>179</line>
+          <option name="timeStamp" value="160" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/ARIMA.py</url>
+          <line>177</line>
+          <option name="timeStamp" value="165" />
         </line-breakpoint>
       </breakpoints>
+      <default-breakpoints>
+        <breakpoint type="python-exception">
+          <properties notifyOnTerminate="true" exception="BaseException">
+            <option name="notifyOnTerminate" value="true" />
+          </properties>
+        </breakpoint>
+      </default-breakpoints>
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/MasterThesis$Pipeline_ECGModel.coverage" NAME="Pipeline_ECGModel Coverage Results" MODIFIED="1653990805593" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_KNet_linear.coverage" NAME="main_KNet_linear Coverage Results" MODIFIED="1651935033856" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Unsupervised_EUSIPCO_22" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_linear.coverage" NAME="main_linear Coverage Results" MODIFIED="1652104040499" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
+    <SUITE FILE_PATH="coverage/MasterThesis$PartialECGModel.coverage" NAME="PartialECGModel Coverage Results" MODIFIED="1653818490345" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels" />
+    <SUITE FILE_PATH="coverage/MasterThesis$ECG_model.coverage" NAME="ECG_model Coverage Results" MODIFIED="1652438224189" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_FH_learn.coverage" NAME="main_FH_learn Coverage Results" MODIFIED="1652188126187" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
-    <SUITE FILE_PATH="coverage/MasterThesis$main_ECG.coverage" NAME="main_ECG Coverage Results" MODIFIED="1652281912743" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
+    <SUITE FILE_PATH="coverage/MasterThesis$ARIMA.coverage" NAME="ARIMA Coverage Results" MODIFIED="1654425498836" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
+    <SUITE FILE_PATH="coverage/MasterThesis$main_ECG.coverage" NAME="main_ECG Coverage Results" MODIFIED="1652442931323" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
+    <SUITE FILE_PATH="coverage/MasterThesis$main_ARMA.coverage" NAME="main_ARMA Coverage Results" MODIFIED="1654336624598" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
   </component>
 </project>
