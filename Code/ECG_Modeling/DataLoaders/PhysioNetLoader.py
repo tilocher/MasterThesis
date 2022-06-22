@@ -60,7 +60,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         self.fs = self.files[0].fs
 
-        self.dataset = torch.tensor([file.p_signal for file in self.files])
+        self.dataset = torch.tensor([file.p_signal for file in self.files]).mT
 
         self.SplitToSeconds(sample_len_sec)
 
@@ -77,7 +77,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         samples = int((sample_len_sec * self.fs))
 
-        split_data = torch.split(self.dataset, samples, dim=1)[:-1]
+        split_data = torch.split(self.dataset, samples, dim=-1)[:-1]
 
         split_data = self.split_dataset = torch.concat(split_data, dim=0)
 
@@ -106,13 +106,13 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         """
 
         signals = self.split_dataset
-        signal_power_dB = 10 * torch.log10(signals.var(1) + signals.mean(1) ** 2)
+        signal_power_dB = 10 * torch.log10(signals.var(-1) + signals.mean(-1) ** 2)
 
         noise_power_dB = signal_power_dB - SNR_dB
-        noise_power = 10 ** (noise_power_dB / 20).unsqueeze(1)
+        noise_power = 10 ** (noise_power_dB / 20).unsqueeze(-1)
 
-        noise = np.random.normal(np.zeros_like(signals), noise_power.repeat(1, signals.shape[1], 1), signals.shape)
-        noise_power_num = 10 * np.log10(noise.var(1) + noise.mean(1) ** 2)
+        noise = np.random.normal(np.zeros_like(signals), noise_power.repeat(1,1,  signals.shape[-1]), signals.shape)
+        noise_power_num = 10 * np.log10(noise.var(-1) + noise.mean(-1) ** 2)
         print('SNR of actual signal', round((signal_power_dB - noise_power_num).mean().item(), 3), '[dB]')
 
         noisy_sample = signals + noise
@@ -127,11 +127,11 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         # Randomly select sample and channel
         sample = np.random.randint(0, self.split_dataset.shape[0])
-        channel = np.random.randint(0, self.split_dataset.shape[-1])
+        channel = np.random.randint(0, self.split_dataset.shape[1])
 
         # Get the sample
-        sample_signal = self.split_dataset[sample, :, channel]
-        noisy_sample = self.noisy_dataset[sample, :, channel]
+        sample_signal = self.split_dataset[sample, channel,:]
+        noisy_sample = self.noisy_dataset[sample, channel,:]
 
         # Time axis
         t = np.arange(start=0, stop=sample_signal.shape[0] / (self.fs), step=1 / (self.fs))
@@ -146,6 +146,9 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         plt.savefig('..\\Plots\\MIT-BIH_sample_plot_snr_{}dB.pdf'.format(round(self.SNR_dB, 2)))
         plt.show()
 
+
+    def GetData(self):
+        return self.noisy_dataset, self.split_dataset
 
 if __name__ == '__main__':
     dataset = PhyioNetLoader_MIT_NIH(4, 2, 10)
