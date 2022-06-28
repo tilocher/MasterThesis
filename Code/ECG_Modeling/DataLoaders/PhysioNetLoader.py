@@ -45,7 +45,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         and: https://archive.physionet.org/physiobank/database/mitdb/
     '''
 
-    def __init__(self, num_sets: int, sample_len_sec: float, SNR_dB: float):
+    def __init__(self, num_sets: int, sample_len_sec: float, SNR_dB: float, random_sample = True):
         super(PhyioNetLoader_MIT_NIH, self).__init__()
 
         self.sample_len_sec = sample_len_sec
@@ -54,13 +54,16 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         header_files = glob.glob('..\\Datasets\\PhysioNet\\MIT-BIH_Arrhythmia_Database\\*.hea')
 
-        rand_sample = np.random.choice(header_files, num_sets, replace=False)
+        if not random_sample:
+            sample = header_files[:num_sets]
+        else:
+            sample = np.random.choice(header_files, num_sets, replace=False)
 
-        self.files = [wfdb.rdrecord(header_file[:-4]) for header_file in rand_sample]
+        self.files = [wfdb.rdrecord(header_file[:-4]) for header_file in sample]
 
         self.fs = self.files[0].fs
 
-        self.dataset = torch.tensor([file.p_signal for file in self.files]).mT
+        self.dataset = torch.tensor([file.p_signal for file in self.files],dtype= torch.float32).mT
 
         self.SplitToSeconds(sample_len_sec)
 
@@ -111,7 +114,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         noise_power_dB = signal_power_dB - SNR_dB
         noise_power = 10 ** (noise_power_dB / 20).unsqueeze(-1)
 
-        noise = np.random.normal(np.zeros_like(signals), noise_power.repeat(1,1,  signals.shape[-1]), signals.shape)
+        noise = torch.normal(torch.zeros_like(signals), noise_power.repeat(1,1,  signals.shape[-1]))
         noise_power_num = 10 * np.log10(noise.var(-1) + noise.mean(-1) ** 2)
         print('SNR of actual signal', round((signal_power_dB - noise_power_num).mean().item(), 3), '[dB]')
 
@@ -147,8 +150,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         plt.show()
 
 
-    def GetData(self):
-        return self.noisy_dataset, self.split_dataset
+    def GetData(self,num_batches):
+        return self.noisy_dataset[:num_batches], self.split_dataset[:num_batches]
 
 if __name__ == '__main__':
     dataset = PhyioNetLoader_MIT_NIH(4, 2, 10)
