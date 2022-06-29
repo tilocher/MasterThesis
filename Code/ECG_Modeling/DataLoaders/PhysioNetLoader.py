@@ -63,7 +63,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         self.fs = self.files[0].fs
 
-        self.dataset = torch.tensor([file.p_signal for file in self.files],dtype= torch.float32).mT
+        self.dataset = torch.tensor(np.array([file.p_signal for file in self.files]),dtype= torch.float32).mT
 
         self.SplitToSeconds(sample_len_sec)
 
@@ -116,7 +116,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         noise = torch.normal(torch.zeros_like(signals), noise_power.repeat(1,1,  signals.shape[-1]))
         noise_power_num = 10 * np.log10(noise.var(-1) + noise.mean(-1) ** 2)
-        print('SNR of actual signal', round((signal_power_dB - noise_power_num).mean().item(), 3), '[dB]')
+        print('SNR of actual signal', round((noise_power_num).mean().item(), 3), '[dB]')
 
         noisy_sample = signals + noise
 

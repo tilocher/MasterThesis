@@ -16,7 +16,7 @@ from Code.ECG_Modeling.Filters.EKF import ExtendedKalmanFilter
 
 class EM_algorithm():
 
-    def __init__(self,ssModel: SystemModel, parameters: tuple = ('R'), **kwargs):
+    def __init__(self,ssModel: SystemModel, parameters: list = ('R'), **kwargs):
 
         self.ssModel = ssModel
         self.m = ssModel.m
@@ -35,6 +35,11 @@ class EM_algorithm():
 
 
         self.units = kwargs['units'] if 'units' in kwargs.keys() else ''
+
+        self.random_plot = False
+
+    def SetRandomPlot(self,value: bool):
+        self.random_plot = value
 
 
 
@@ -82,14 +87,21 @@ class EM_algorithm():
             else:
                 t = np.linspace(0,self.T, self.T)
 
-            rand_sample = np.random.randint(0,self.batch_size)
-            rand_channel = np.random.randint(0,self.channels)
+            if self.random_plot:
+
+                rand_sample = np.random.randint(0,self.batch_size)
+                rand_channel = np.random.randint(0,self.channels)
+
+            else:
+
+                rand_sample = 0
+                rand_channel = 0
 
             if states != None:
                 plt.plot(t,states[rand_sample,rand_channel].squeeze(), label='Noiseless data', alpha=0.8, color='g')
             plt.plot(t,observations[rand_sample,rand_channel].squeeze(), label='noisy data', alpha=0.3, color='r')
 
-            plt.plot(t,filtered_states[rand_sample,rand_channel,0].squeeze(), label='Estimated State', color='b')
+            plt.plot(t,self.ssModel.h(filtered_states[rand_sample,rand_channel],t).squeeze(), label='Estimated State', color='b')
 
             if 'plot_title' in self.__dict__:
                 title_string = 'Filtered Signal Sample, {}'.format(self.plot_title)
@@ -118,6 +130,8 @@ class EM_algorithm():
 
         Q = q_2 * torch.eye(self.m) if Q == None else Q
         R = r_2 * torch.eye(self.n)
+
+        self.ssModel.UpdateCovariance_Matrix(Q,R)
 
         losses = []
 
@@ -199,8 +213,11 @@ class EM_algorithm():
                 plt.ylabel('Loss [dB]')
                 plt.title('EM optimization convergence '+ self.plot_title)
                 plt.legend()
-                plt.savefig('..\\Plots\\EM_convergence_plot.pdf')
+                plt.savefig('..\\Plots\\EM_convergence_plot{}.pdf'.format(Plot))
                 plt.show()
+
+        if loss != None:
+            return losses
 
 
 if __name__ == '__main__':

@@ -38,7 +38,7 @@ class Taylor_model():
     def predict(self, x, t):
 
         x_input = torch.tensor(
-                np.array([x.detach().numpy() ** i for i in range(1, self.taylor_order + 1)])).T.float()
+                np.array([x.detach().numpy() ** i for i in range(1, self.taylor_order + 1)])).reshape((1,-1)).float()
         if np.abs((x_input @ self.coefficients[int(t)]).float()) > 10:
             print('ola')
 

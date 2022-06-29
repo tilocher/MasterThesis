@@ -9,6 +9,7 @@ import scipy.special
 from matplotlib import pyplot as plt
 from tqdm import trange
 from datetime import datetime
+from Code.ECG_Modeling.SystemModels.Extended_sysmdl import SystemModel
 
 
 # System model based on https://ieeexplore.ieee.org/abstract/document/1186732
@@ -279,6 +280,7 @@ class ECG_signal():
         :return: None
         """
         torch.save(self,'..\\Datasets\\Synthetic\\{}.pt'.format(datetime.today().strftime('%d.%m.%y--%H.%M')))
+
 
 
 if __name__ == '__main__':

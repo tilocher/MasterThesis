@@ -2,12 +2,16 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="d12d40bb-4d32-4d02-a40d-1fa34b7862aa" name="Changes" comment="backup">
-      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Filters/Taylor_model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Plots/Ploting_results.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Filters/Comparison.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/SystemModels/ECG_statespace.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders/PhysioNetLoader.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders/PhysioNetLoader.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/Filters/ConstantModels.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Filters/ConstantModels.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/Filters/EM.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Filters/EM.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/Filters/Taylor_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Filters/Taylor_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/NN/AutoEncoder.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/NN/AutoEncoder.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/Plots/Ploting_results.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Plots/Ploting_results.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/ECG_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels/ECG_model.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -52,12 +56,66 @@
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="WebServerToolWindowPanel.toolwindow.highlight.mappings" value="true" />
+    <property name="WebServerToolWindowPanel.toolwindow.highlight.symlinks" value="true" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.date" value="false" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.permissions" value="false" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.size" value="false" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$/Code/ECG_Modeling/Plots" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Timur\Desktop\MasterThesis\Code\ECG_Modeling" />
+    </key>
+  </component>
   <component name="RunManager" selected="Python.ConstantModels">
+    <configuration name="AutoEncoder" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/NN" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/NN/AutoEncoder.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Comparison" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/Filters/Comparison.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="ConstantModels" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="MasterThesis" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -102,28 +160,6 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="LS_Taylor" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="MasterThesis" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/Filters/LS_Taylor.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
     <configuration name="Ploting_results" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="MasterThesis" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -138,28 +174,6 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/Plots/Ploting_results.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Taylor_model" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="MasterThesis" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/Filters/Taylor_model.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -192,19 +206,19 @@
     </configuration>
     <list>
       <item itemvalue="Python.main_FH_learn" />
-      <item itemvalue="Python.LS_Taylor" />
       <item itemvalue="Python.EM" />
-      <item itemvalue="Python.Taylor_model" />
       <item itemvalue="Python.Ploting_results" />
       <item itemvalue="Python.ConstantModels" />
+      <item itemvalue="Python.Comparison" />
+      <item itemvalue="Python.AutoEncoder" />
     </list>
     <recent_temporary>
       <list>
         <item itemvalue="Python.ConstantModels" />
-        <item itemvalue="Python.EM" />
+        <item itemvalue="Python.AutoEncoder" />
         <item itemvalue="Python.Ploting_results" />
-        <item itemvalue="Python.Taylor_model" />
-        <item itemvalue="Python.LS_Taylor" />
+        <item itemvalue="Python.Comparison" />
+        <item itemvalue="Python.EM" />
       </list>
     </recent_temporary>
   </component>
@@ -255,7 +269,8 @@
       <workItem from="1655882148924" duration="16556000" />
       <workItem from="1655967829990" duration="21471000" />
       <workItem from="1656361188859" duration="4224000" />
-      <workItem from="1656397620136" duration="2078000" />
+      <workItem from="1656397620136" duration="32555000" />
+      <workItem from="1656484511455" duration="7558000" />
     </task>
     <task id="LOCAL-00001" summary="Added ECG model for evolution learning and LS Taylor model">
       <created>1655397551914</created>
@@ -278,7 +293,14 @@
       <option name="project" value="LOCAL" />
       <updated>1655904189330</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="backup">
+      <created>1656399712419</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1656399712419</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -401,11 +423,6 @@
           <option name="timeStamp" value="294" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/NN/AutoEncoder.py</url>
-          <line>212</line>
-          <option name="timeStamp" value="295" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/LS_Taylor.py</url>
           <line>281</line>
           <option name="timeStamp" value="328" />
@@ -431,24 +448,39 @@
           <option name="timeStamp" value="363" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/Taylor_model.py</url>
-          <line>42</line>
-          <option name="timeStamp" value="455" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/ConstantModels.py</url>
-          <line>108</line>
-          <option name="timeStamp" value="503" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/EM.py</url>
-          <line>185</line>
+          <line>199</line>
           <option name="timeStamp" value="513" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/EM.py</url>
-          <line>169</line>
-          <option name="timeStamp" value="515" />
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/Comparison.py</url>
+          <line>107</line>
+          <option name="timeStamp" value="519" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/Comparison.py</url>
+          <line>103</line>
+          <option name="timeStamp" value="554" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/Comparison.py</url>
+          <line>79</line>
+          <option name="timeStamp" value="556" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/Comparison.py</url>
+          <line>77</line>
+          <option name="timeStamp" value="557" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/EKF.py</url>
+          <line>162</line>
+          <option name="timeStamp" value="558" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/NN/AutoEncoder.py</url>
+          <line>220</line>
+          <option name="timeStamp" value="560" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
@@ -462,6 +494,7 @@
     <watches-manager>
       <configuration name="PythonConfigurationType">
         <watch expression="self.T_test" />
+        <watch expression="self.m2y" language="Python" />
       </configuration>
     </watches-manager>
   </component>
@@ -476,13 +509,14 @@
     <SUITE FILE_PATH="coverage/MasterThesis$main_ECG.coverage" NAME="main_ECG Coverage Results" MODIFIED="1652442931323" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
     <SUITE FILE_PATH="coverage/MasterThesis$Pipeline_ECGModel.coverage" NAME="Pipeline_ECGModel Coverage Results" MODIFIED="1653990805593" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines" />
     <SUITE FILE_PATH="coverage/MasterThesis$ARIMA_improved.coverage" NAME="ARIMA_improved Coverage Results" MODIFIED="1654694227513" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
-    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder.coverage" NAME="AutoEncoder Coverage Results" MODIFIED="1655730533269" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/NN" />
+    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder.coverage" NAME="AutoEncoder Coverage Results" MODIFIED="1656491477436" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/NN" />
     <SUITE FILE_PATH="coverage/MasterThesis$PartialECGModel.coverage" NAME="PartialECGModel Coverage Results" MODIFIED="1653818490345" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels" />
-    <SUITE FILE_PATH="coverage/MasterThesis$Ploting_results.coverage" NAME="Ploting_results Coverage Results" MODIFIED="1655986059202" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Plots" />
+    <SUITE FILE_PATH="coverage/MasterThesis$Ploting_results.coverage" NAME="Ploting_results Coverage Results" MODIFIED="1656457743528" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Plots" />
     <SUITE FILE_PATH="coverage/MasterThesis$ECG_model.coverage" NAME="ECG_model Coverage Results" MODIFIED="1655126671876" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels" />
     <SUITE FILE_PATH="coverage/MasterThesis$LS_Taylor.coverage" NAME="LS_Taylor Coverage Results" MODIFIED="1655899170381" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
     <SUITE FILE_PATH="coverage/MasterThesis$EM.coverage" NAME="EM Coverage Results" MODIFIED="1655986139383" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
-    <SUITE FILE_PATH="coverage/MasterThesis$ConstantModels.coverage" NAME="ConstantModels Coverage Results" MODIFIED="1656399497279" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
+    <SUITE FILE_PATH="coverage/MasterThesis$Comparison.coverage" NAME="Comparison Coverage Results" MODIFIED="1656413773154" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
+    <SUITE FILE_PATH="coverage/MasterThesis$ConstantModels.coverage" NAME="ConstantModels Coverage Results" MODIFIED="1656494092506" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_FH_learn.coverage" NAME="main_FH_learn Coverage Results" MODIFIED="1652188126187" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_ARMA.coverage" NAME="main_ARMA Coverage Results" MODIFIED="1654336624598" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
   </component>

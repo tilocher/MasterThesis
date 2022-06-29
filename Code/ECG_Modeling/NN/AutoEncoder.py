@@ -177,7 +177,7 @@ class Encoder(torch.nn.Module):
 
 
         self.ConvLayers = nn.ModuleList([
-            nn.Conv2d(in_channels= 6 ,out_channels= 6,
+            nn.Conv2d(in_channels= 1 ,out_channels= 1,
                       kernel_size= self.conv_kernels[i], stride= self.conv_strides[i],
                       ) for i in range(self._num_conv_layers)
         ])
