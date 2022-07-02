@@ -10,6 +10,7 @@ import torch
 
 import matplotlib.pyplot as plt
 from torch.utils.data.dataloader import DataLoader, Dataset
+import os
 
 
 class PhyioNetLoader_AbdominalAndDirect(Dataset):
@@ -45,46 +46,75 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         and: https://archive.physionet.org/physiobank/database/mitdb/
     '''
 
-    def __init__(self, num_sets: int, sample_len_sec: float, SNR_dB: float, random_sample = True):
+    def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = True):
         super(PhyioNetLoader_MIT_NIH, self).__init__()
 
-        self.sample_len_sec = sample_len_sec
+        assert isinstance(num_samples,int), 'Number of samples must be an integer'
+        assert isinstance(num_samples, int), 'Number of heartbeats must be an integer'
+
+        self.num_beats = num_beats
 
         self.SNR_dB = SNR_dB
 
-        header_files = glob.glob('..\\Datasets\\PhysioNet\\MIT-BIH_Arrhythmia_Database\\*.hea')
+        self.num_samples = num_samples
+
+        self.file_location = os.path.dirname(os.path.realpath(__file__))
+
+
+        header_files = glob.glob(self.file_location + '\\..\\Datasets\\PhysioNet\\MIT-BIH_Arrhythmia_Database\\*.hea')
+        annotation_files = glob.glob(self.file_location + '\\..\\Datasets\\PhysioNet\\MIT-BIH_Arrhythmia_Database\\*.atr')
 
         if not random_sample:
-            sample = header_files[:num_sets]
+            sample_header = header_files[:num_sets]
+            sample_annotation = annotation_files[:num_sets]
         else:
-            sample = np.random.choice(header_files, num_sets, replace=False)
+            sample_header = np.random.choice(header_files, num_sets, replace=False)
+            sample_annotation = annotation_files[:num_sets]
 
-        self.files = [wfdb.rdrecord(header_file[:-4]) for header_file in sample]
+        self.files = [wfdb.rdrecord(header_file[:-4]) for header_file in sample_header]
+        self.annotation = [wfdb.rdann(annotation_file[:-4], 'atr' ) for annotation_file in sample_annotation]
 
         self.fs = self.files[0].fs
+        self.num_channels = self.files[0].n_sig
 
         self.dataset = torch.tensor(np.array([file.p_signal for file in self.files]),dtype= torch.float32).mT
+        self.labels = torch.tensor(np.array([file.sample for file in self.annotation]),dtype= torch.float32)[0,1:]
 
-        self.SplitToSeconds(sample_len_sec)
+        self.Center()
 
         self.AddGaussianNoise(SNR_dB)
 
         self.PlotSample()
 
-    def SplitToSeconds(self, sample_len_sec: float) -> torch.Tensor:
-        """
-        Split the dataset into sample_len_sec long segments
-        :param sample_len_sec: The length in seconds of the desired signal
-        :return: The split dataset
-        """
+    def Center(self):
 
-        samples = int((sample_len_sec * self.fs))
+        beat_indices_last = self.labels[self.num_beats-1::self.num_beats]
+        beat_indices_first = self.labels[0::self.num_beats]
+        intermediate = []
 
-        split_data = torch.split(self.dataset, samples, dim=-1)[:-1]
 
-        split_data = self.split_dataset = torch.concat(split_data, dim=0)
+        last_index = 0
 
-        return split_data
+        for i, index in enumerate(beat_indices_last):
+
+            if self.num_beats == 1:
+                middle = int(last_index + int((index - last_index)/1))
+            else:
+                middle = int( last_index + (index - beat_indices_first[i]) / 2)
+
+            lower_index = middle - int(self.num_samples/2)
+            upper_index = middle + int(self.num_samples/2)
+
+            if lower_index >= 0 and upper_index < self.dataset.shape[-1]:
+
+                intermediate.append(self.dataset[:,:,lower_index:upper_index])
+
+            last_index = index
+
+        centered_data  = torch.stack(intermediate,dim=1)
+        centered_data = self.centerd_data = centered_data.reshape((-1,self.num_channels,self.num_samples))
+        return centered_data
+
 
     def __getitem__(self, item: int) -> tuple:
         """
@@ -92,14 +122,14 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         :param item: index of the samples to get
         :return: A tuple of noisy and clean samples
         """
-        return self.noisy_dataset[item], self.split_dataset[item]
+        return self.noisy_dataset[item], self.centerd_data[item]
 
     def __len__(self) -> int:
         """
         Get the size of the dataset
         :return: Size of the dataset
         """
-        return self.split_dataset.shape[0]
+        return self.centerd_data.shape[0]
 
     def AddGaussianNoise(self, SNR_dB: float) -> None:
         """
@@ -108,7 +138,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         :return:
         """
 
-        signals = self.split_dataset
+        signals = self.centerd_data
         signal_power_dB = 10 * torch.log10(signals.var(-1) + signals.mean(-1) ** 2)
 
         noise_power_dB = signal_power_dB - SNR_dB
@@ -116,7 +146,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         noise = torch.normal(torch.zeros_like(signals), noise_power.repeat(1,1,  signals.shape[-1]))
         noise_power_num = 10 * np.log10(noise.var(-1) + noise.mean(-1) ** 2)
-        print('SNR of actual signal', round((noise_power_num).mean().item(), 3), '[dB]')
+        print('SNR of actual signal', round( ( signal_power_dB - noise_power_num).mean().item(), 3), '[dB]')
 
         noisy_sample = signals + noise
 
@@ -129,11 +159,11 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         """
 
         # Randomly select sample and channel
-        sample = np.random.randint(0, self.split_dataset.shape[0])
-        channel = np.random.randint(0, self.split_dataset.shape[1])
+        sample = np.random.randint(0, self.centerd_data.shape[0])
+        channel = np.random.randint(0, self.centerd_data.shape[1])
 
         # Get the sample
-        sample_signal = self.split_dataset[sample, channel,:]
+        sample_signal = self.centerd_data[sample, channel,:]
         noisy_sample = self.noisy_dataset[sample, channel,:]
 
         # Time axis
@@ -146,12 +176,12 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         plt.ylabel('Amplitude [mV]')
         plt.title('MIT-BIH Dataset sample with additive GWN: SNR {} [dB]'.format(round(self.SNR_dB, 2)))
         plt.legend()
-        plt.savefig('..\\Plots\\MIT-BIH_sample_plot_snr_{}dB.pdf'.format(round(self.SNR_dB, 2)))
+        plt.savefig(self.file_location + '\\..\\Plots\\MIT-BIH-samples\\MIT-BIH_sample_plot_snr_{}dB.pdf'.format(round(self.SNR_dB, 2)))
         plt.show()
 
 
     def GetData(self,num_batches):
-        return self.noisy_dataset[:num_batches], self.split_dataset[:num_batches]
+        return self.noisy_dataset[:num_batches], self.centerd_data[:num_batches]
 
 if __name__ == '__main__':
     dataset = PhyioNetLoader_MIT_NIH(4, 2, 10)

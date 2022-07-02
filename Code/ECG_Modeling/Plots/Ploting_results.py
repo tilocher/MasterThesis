@@ -36,7 +36,7 @@ def EM_results_ploting_taylor_model():
     plt.xlabel('SNR [dB]')
     plt.ylabel('MSE [dB]')
     plt.title('MSE per SNR for MIT-BIH dataset with ADWGN with constant ss-Model')
-    plt.savefig('MIT-BIH-MSE.pdf')
+    plt.savefig('MSE_plots\\MIT-BIH-MSE.pdf')
     plt.show()
 
 if __name__ == '__main__':

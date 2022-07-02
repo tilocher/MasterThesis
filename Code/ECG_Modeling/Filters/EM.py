@@ -2,6 +2,7 @@
 # author: T. Locher, tilocher@ethz.ch
 # _____________________________________________________________
 import datetime
+import os
 import time
 
 import matplotlib.pyplot as plt
@@ -51,32 +52,30 @@ class EM_algorithm():
         KF.InitSequence(self.ssModel.m1x_0, self.ssModel.m2x_0)
         RTS = Extended_rts_smoother(self.ssModel)
 
-        MSE_RTS_linear_arr = torch.empty((self.batch_size,self.channels)) if states != None else None
+        MSE_RTS = torch.empty(1) if states != None else None
         loss_rts = torch.nn.MSELoss(reduction='mean')
 
-        filtered_states = torch.empty((self.batch_size, self.channels, self.ssModel.m, self.T))
-        error_cov = torch.empty((self.batch_size,self.channels, self.ssModel.m, self.ssModel.m, self.T))
-        KGs = torch.empty((self.batch_size, self.channels, self.ssModel.m, self.ssModel.m, self.T))
+
         # Run Loop
 
         with torch.no_grad():
-            for j in range(self.batch_size):
-                for i in range(self.channels):
-                    KF.GenerateSequence(observations[j,i].reshape((self.n,-1)), KF.T_test)
-                    RTS.GenerateSequence(KF.x, KF.sigma, RTS.T_test)
 
-                    if states != None:
+            KF.GenerateSequence(observations.reshape((self.n,-1)), KF.T_test)
+            RTS.GenerateSequence(KF, RTS.T_test)
 
-                        MSE_RTS_linear_arr[j,i] = loss_rts(self.ssModel.h(RTS.s_x,0).squeeze(), states[j,i].squeeze()).item()
+            if states != None:
+
+                MSE_RTS = loss_rts(self.ssModel.h(RTS.s_x,0).squeeze(), states.squeeze())
 
 
-                    filtered_states[j,i] = RTS.s_x
-                    error_cov[j,i] = RTS.s_sigma
-                    KGs[j,i] = RTS.SG_array.reshape(self.ssModel.m , self.ssModel.m , self.T)
+            filtered_states = RTS.s_x
+            error_cov = RTS.s_sigma
+            KGs = RTS.SG_array.reshape(self.ssModel.m , self.ssModel.m , self.T)
+            KGs = RTS.s_smooth_prior
 
             if states != None:
                 print('Mean RTS loss Estimated Model: {} [dB]'.format(
-                10 * torch.log10(MSE_RTS_linear_arr.mean()).item()))
+                10 * torch.log10(MSE_RTS).item()))
 
         self.EstRTS = RTS
 
@@ -87,21 +86,12 @@ class EM_algorithm():
             else:
                 t = np.linspace(0,self.T, self.T)
 
-            if self.random_plot:
-
-                rand_sample = np.random.randint(0,self.batch_size)
-                rand_channel = np.random.randint(0,self.channels)
-
-            else:
-
-                rand_sample = 0
-                rand_channel = 0
 
             if states != None:
-                plt.plot(t,states[rand_sample,rand_channel].squeeze(), label='Noiseless data', alpha=0.8, color='g')
-            plt.plot(t,observations[rand_sample,rand_channel].squeeze(), label='noisy data', alpha=0.3, color='r')
+                plt.plot(t,states.squeeze(), label='Noiseless data', alpha=0.8, color='g')
+            plt.plot(t,observations.squeeze(), label='noisy data', alpha=0.3, color='r')
 
-            plt.plot(t,self.ssModel.h(filtered_states[rand_sample,rand_channel],t).squeeze(), label='Estimated State', color='b')
+            plt.plot(t,self.ssModel.h(filtered_states,t).squeeze(), label='Estimated State', color='b')
 
             if 'plot_title' in self.__dict__:
                 title_string = 'Filtered Signal Sample, {}'.format(self.plot_title)
@@ -117,11 +107,12 @@ class EM_algorithm():
             plt.ylabel(ylabel_string)
             plt.legend()
             if Plot != 'Plot':
-                plt.savefig('..\\Plots\\EM_filtered_Sample_{}_{}.pdf'.format(str(datetime.datetime.now().date()),Plot))
+                plt.savefig(os.path.dirname(os.path.realpath(__file__)) +
+                            '\\..\\Plots\\EM_filtered_sample\\EM_filtered_Sample_{}_{}.pdf'.format(str(datetime.datetime.now().date()),Plot))
             plt.show()
             plt.clf()
 
-        return filtered_states, error_cov, KGs, MSE_RTS_linear_arr
+        return filtered_states, error_cov, KGs, MSE_RTS
 
 
     def EM(self,observation: torch.Tensor, state: torch.Tensor = None, q_2 = 1., r_2 = 1. ,
@@ -137,16 +128,17 @@ class EM_algorithm():
 
         with torch.no_grad():
 
-            batch_size = self.batch_size  = observation.shape[0]
             T = self.T = observation.shape[-1]
-            channels = self.channels = 1 if len(observation.shape) <= 2 else observation.shape[1]
 
             self.ssModel.T = self.ssModel.T_test = T
 
-            observation = observation.reshape((batch_size,channels,self.n,T))
+            observation = observation.reshape((self.n,T))
 
             if state != None:
-                state = state.reshape((batch_size,channels, self.n, T))
+                state = state.reshape((self.n, T))
+
+            if 'Q' in self.parameters:
+                self.ssModel.UpdateQ(Q)
 
             for i in range(num_itts):
 
@@ -154,52 +146,63 @@ class EM_algorithm():
                 if 'R' in self.parameters:
                     self.ssModel.UpdateR(R)
 
-                if 'Q' in self.parameters:
-                    self.ssModel.UpdateQ(Q)
 
-                filtered_states,error_cov,SGs,loss = self.FilterEstimatedModel(observation,state , Plot= Plot)
+                if i == num_itts -1:
+                    Plot_ = Plot
+                else:
+                    Plot_ = ''
+                filtered_states,error_cov,SGs,loss = self.FilterEstimatedModel(observation,state , Plot= Plot_)
 
-                error_cov = error_cov.mean(0).reshape((channels, self.m,self.m,-1))
-                SGs = SGs.mean(0).reshape((channels, self.m,self.m,-1))
-                Smoothed_Covariance = torch.einsum('cnnt,cmmt->cnmt', (error_cov[:,:,:,1:], SGs.transpose(1, 2)[:,:,:,:-1])) / batch_size
-                E_xx = torch.einsum('bcmt,bcnt->cmnt',(filtered_states,filtered_states))/batch_size
+                observation = observation.reshape((-1,self.n,1))
+                filtered_states = filtered_states.reshape((-1,self.m,1))
+                error_cov = error_cov.reshape((-1, self.m,self.m))
+                SGs = SGs.reshape((-1, self.m,self.m))
 
-                U_xx = (E_xx + error_cov).mean(0).mean(-1)
-                U_yx = (torch.einsum('bcnt,bcmt->cnmt',(observation,filtered_states))/batch_size).mean(-1).mean(0)
 
-                U_yy = (torch.einsum('bcnt,bcmt->cnmt',(observation,observation))/batch_size).mean(0).mean(-1)
-                C = U_yx @ torch.inverse(U_xx)
+                # Smoothed_Covariance = torch.bmm(error_cov[1:], SGs.mT[:-1])
+                E_xx = torch.bmm(filtered_states,filtered_states.mT)
+
+                U_xx = E_xx + error_cov
+                U_yx = torch.bmm(observation,filtered_states.mT)
+
+                U_yy = torch.bmm(observation,observation.mT)
+                C = U_yx @ torch.linalg.pinv(U_xx)
 
                 if 'C' in self.parameters:
-                    self.ssModel.setHJac(lambda x,t: C)
+                    self.ssModel.setHJac(lambda x,t: C[t])
 
-                if 'R' in self.parameters:
-                    R = U_yy - C @ U_yx.T
+                if 'R' in self.parameters and 'C' in self.parameters:
+                    R = (U_yy - torch.bmm(C , U_yx.mT)).mean(0)
+                elif 'R' in self.parameters and 'C' not in self.parameters:
+                    C = self.ssModel.HJac(filtered_states,0).repeat(T, 1, 1)
+                    R = (U_yy - torch.bmm(C, U_yx.mT) - torch.bmm( U_yx, C.mT) + torch.bmm(torch.bmm(C,U_xx),C.mT)).mean(0)
 
-                V_xx = (E_xx[:,:,:,:-1] + error_cov[:,:,:,:-1]).mean(0)
-                V_x1x1 = (E_xx[:,:,:,1:] + error_cov[:,:,:,1:]).mean(0)
-                V_x1x = (((torch.einsum('bcnt,bcmt->cnmt', (filtered_states[:,:,:,1:], filtered_states[:,:,:,:-1]))/batch_size)
-                          + Smoothed_Covariance).reshape((self.channels,self.m,self.m,-1))).mean(0)
+
+                V_xx = (E_xx[:-1,:,:] + error_cov[:-1,:,:])
+                V_x1x1 = (E_xx[1:,:,:] + error_cov[1:,:,:])
+                V_x1x = torch.bmm(filtered_states[1:],filtered_states[:-1].mT) + SGs
 
                 if 'A' in self.parameters or 'Q' in self.parameters:
 
 
                     if 'A' in self.parameters:
-                        A = torch.bmm(V_x1x.reshape(-1, self.m, self.m),
-                                      torch.inverse(V_xx.reshape(-1, self.m, self.m))).reshape((self.m, self.m, -1))
+                        A = torch.bmm(V_x1x,torch.linalg.pinv(V_xx))
 
                         # self.ssModel.setFJac(lambda x,t: A[:,:,t-1] if t > 0 else torch.eye(self.n) )
-                        A_mean = A.mean(-1)
+                        A_mean = A.mean(0)
                         self.ssModel.setFJac(lambda x,t: A_mean)
 
-                    if 'Q' in self.parameters and 'A' not in self.parameters:
-                        Q = (V_x1x1.mean(-1) - V_x1x.mean(-1))# - V_x1x.mean(-1).T + V_xx.mean(-1)) #(V_x1x1 - torch.bmm(A.T,V_x1x.T).T).mean()
-                    elif 'Q' in self.parameters and 'A' in self.parameters:
-                        Q = (V_x1x1.mean(-1) - V_x1x.mean(-1) - V_x1x.mean(-1).T + V_xx.mean(-1))
-                if torch.any(torch.abs(torch.linalg.eigvals(Q)) < 0 ):
-                    print('noonononono')
+                    if 'Q' in self.parameters and 'A' in self.parameters:
+                        Q = (V_x1x1 - torch.bmm(A,V_x1x.mT)).mean(0)# - V_x1x.mean(-1).T + V_xx.mean(-1)) #(V_x1x1 - torch.bmm(A.T,V_x1x.T).T).mean()
+                    elif 'Q' in self.parameters and 'A' not in self.parameters:
+                        A = self.ssModel.FJac(filtered_states, 0).repeat(T-1, 1, 1)
+                        Q = (V_x1x1 - torch.bmm(A,V_x1x.mT) -  torch.bmm(V_x1x,A.mT) + torch.bmm(torch.bmm(A,V_xx),A.mT))
+                        self.ssModel.SetQ_array(torch.cat((torch.eye(self.m).unsqueeze(0), Q)))
 
-                self.ssModel.InitSequence(filtered_states.mean((0,1))[:,0], error_cov.mean(0)[:,:,0])
+                # if torch.any(torch.abs(torch.linalg.eigvals(Q)) < 0 ):
+                #     print('noonononono')
+
+                self.ssModel.InitSequence(filtered_states[0], error_cov[0])
 
                 if loss != None:
                     losses.append(10*torch.log10(loss.mean()).item())
@@ -213,7 +216,7 @@ class EM_algorithm():
                 plt.ylabel('Loss [dB]')
                 plt.title('EM optimization convergence '+ self.plot_title)
                 plt.legend()
-                plt.savefig('..\\Plots\\EM_convergence_plot{}.pdf'.format(Plot))
+                plt.savefig(os.path.dirname(os.path.realpath(__file__)) + '\\..\\Plots\\EM_convergence\\EM_convergence_plot{}.pdf'.format(Plot))
                 plt.show()
 
         if loss != None:
