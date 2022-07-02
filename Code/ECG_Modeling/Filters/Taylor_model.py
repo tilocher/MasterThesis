@@ -93,6 +93,7 @@ class Taylor_model():
                 raise ValueError('Window not supported')
 
             self.window_weights = self.window_weights.float()
+
             self.window_sum = torch.sum(self.window_weights)
             self.n_prediction_weight = torch.arange(-int(self.window_size/2)+1,int(self.window_size/2)+2)
 
