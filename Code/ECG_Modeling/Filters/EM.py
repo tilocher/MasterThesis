@@ -219,8 +219,12 @@ class EM_algorithm():
                 plt.savefig(os.path.dirname(os.path.realpath(__file__)) + '\\..\\Plots\\EM_convergence\\EM_convergence_plot{}.pdf'.format(Plot))
                 plt.show()
 
-        if loss != None:
-            return losses
+            if loss != None:
+                return filtered_states,losses
+            else:
+                losses = loss
+
+            return filtered_states, losses
 
 
 if __name__ == '__main__':

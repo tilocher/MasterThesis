@@ -39,6 +39,14 @@ def EM_results_ploting_taylor_model():
     plt.savefig('MSE_plots\\MIT-BIH-MSE.pdf')
     plt.show()
 
+
+def Plot_Taylor_Windowed():
+
+    snr = 10
+    windows = [5,7,9,11]
+    gaussian_mse = [-24.34 , -23.91, -19.07
+
+
 if __name__ == '__main__':
 
     EM_results_ploting_taylor_model()

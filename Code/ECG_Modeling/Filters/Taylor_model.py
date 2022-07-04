@@ -1,6 +1,8 @@
 # _____________________________________________________________
 # author: T. Locher, tilocher@ethz.ch
 # _____________________________________________________________
+import os
+
 import matplotlib.pyplot as plt
 import scipy.special
 import torch
@@ -43,6 +45,8 @@ class Taylor_model():
 
         else:
             self.window = ''
+            self.window_size = 1
+            self.window_parameters = 1
 
         self.CreateWindow()
 
@@ -72,10 +76,10 @@ class Taylor_model():
             elif self.window == 'gaussian':
 
                 if self.window_parameters == None:
-                    self.window_parameters = [1,1]
+                    self.window_parameters = 1
 
                 self.window_weights = torch.from_numpy(
-                    np.array([ self.window_parameters[0] * np.exp(- (w - int(self.window_size/2))**2 /(2*self.window_parameters[1]))
+                    np.array([ self.window_parameters * np.exp(- (w - int(self.window_size/2))**2 /(2*self.window_parameters))
                               for w in range(self.window_size)]))
 
             elif self.window == 'linear':
@@ -92,10 +96,10 @@ class Taylor_model():
             else:
                 raise ValueError('Window not supported')
 
-            self.window_weights = self.window_weights.float()
+            self.window_weights = torch.diag(self.window_weights).float()
 
             self.window_sum = torch.sum(self.window_weights)
-            self.n_prediction_weight = torch.arange(-int(self.window_size/2)+1,int(self.window_size/2)+2)
+            self.n_prediction_weight = torch.arange(-int(self.window_size/2)+1,int(self.window_size/2)+2).reshape(-1,1).float()
 
 
 
@@ -117,13 +121,14 @@ class Taylor_model():
         data = data.reshape((-1,time_steps))
 
         batch_size = data.shape[0]
+        basis_functions = self.n_prediction_weight.reshape(-1,1).float() @ self.basis_functions.T
+        basis_functions = basis_functions.repeat((batch_size,1,1))
 
-        basis_functions = self.basis_functions.repeat((1,batch_size))
-        basis_functions = basis_functions.reshape((batch_size,1,-1))
 
-        projections = torch.linalg.pinv(torch.bmm(basis_functions.mT, basis_functions))
+        weights = self.window_weights.repeat((batch_size,1,1))
 
-        projections = torch.bmm(projections, basis_functions.mT)
+        basis_functions_w = basis_functions.mT.bmm(torch.sqrt(weights))
+
 
 
         coefficients = torch.zeros((self.taylor_order, time_steps))
@@ -135,23 +140,18 @@ class Taylor_model():
         padded_data = torch.nn.functional.pad(data, (-lower_bound, upper_bound), 'replicate')
 
 
-        squared_weight_sum = (self.window_weights * self.n_prediction_weight**2).sum()
-        squared_weight_sum = (self.n_prediction_weight**2).sum()
-
-        lin_weight_sum = (self.window_weights * self.n_prediction_weight).sum()
-
         for t in range(0, time_steps):
 
             current_state = padded_data[:,-lower_bound + t ].reshape((-1,1))
             observations = padded_data[:,t -lower_bound-half_window+1 :t+half_window - lower_bound + 2]
 
-            target_tensor = observations - current_state
+            target_tensor = (observations - current_state).reshape((batch_size,-1,1))
 
-            target_tensor = (self.window_weights * self.n_prediction_weight * target_tensor).sum(-1).reshape((-1,1,1))
 
-            c =  (1 / squared_weight_sum) * torch.bmm(projections,target_tensor)
-            # c = torch.bmm(projections,target_tensor)
-            # c =  torch.bmm(projections,target_tensor)
+
+            target_tensor_W = target_tensor.mT.bmm(torch.sqrt(weights))
+
+            c = torch.linalg.lstsq(basis_functions_w.mT,target_tensor_W.mT).solution
 
             coefficients[:,t] = c.mean(0).squeeze()
 
@@ -173,9 +173,6 @@ class Taylor_model():
         batch_size = data.shape[0]
 
         basis_functions = self.basis_functions.repeat((1,batch_size)).T
-
-
-
 
 
         coefficients = torch.zeros((self.taylor_order, time_steps))
@@ -202,7 +199,7 @@ class Taylor_model():
     def _predictWindow(self,x,t):
 
 
-        return (x + self.basis_functions.T @ self.coefficients[:, t])#/ (self.window_weights * self.n_prediction_weight**2).sum() )
+        return (x + self.basis_functions.T @ self.coefficients[:, t] ) #/ (self.window_weights * self.n_prediction_weight**2).sum() )
 
     def _predictNoWindow(self, x, t):
 
@@ -210,7 +207,9 @@ class Taylor_model():
 
     def Jacobian(self,x,t):
         # return torch.atleast_2d(self.coefficients[0,t])
-        return torch.ones((1,1))
+
+        return self.coefficients[0,t].reshape((-1,1))
+        # return torch.ones((1,1))
 
     def GetSysModel(self):
 
@@ -224,13 +223,13 @@ class Taylor_model():
 
 if __name__ == '__main__':
 
-
+    print(os.getcwd())
     from Code.ECG_Modeling.Filters.EM import EM_algorithm
 
 
     from Code.ECG_Modeling.DataLoaders.PhysioNetLoader import PhyioNetLoader_MIT_NIH
 
-    snr = -6
+    snr = 6
 
     ts = 360
 
@@ -242,36 +241,79 @@ if __name__ == '__main__':
 
 
 
-    taylor_model = Taylor_model(taylor_order= 5,  window= 'exponential', window_size= 11)#,window_parameters=[1,10])
+    taylor_model = Taylor_model(taylor_order= 5,  window= 'linear', window_size= 7 ,window_parameters = 3)
 
+    shift_obs = torch.empty((num_batches,obs.shape[-1]))
 
+    for t in range(num_batches):
+        shift_obs[t] = torch.roll(obs[t,0],0)#np.random.randint(0,0))
 
-    taylor_model.fit(obs[:num_batches,0,:])
+    # taylor_model.fit(obs[:num_batches,0,:])
+    taylor_model.fit(shift_obs)
+
     #
     ssModel = taylor_model.GetSysModel()
-    ssModel.InitSequence(torch.ones((1,1)), torch.eye(1))
+    ssModel.InitSequence(obs[-3,0,0], torch.eye(1))
     ssModel.GenerateSequence(ssModel.Q,ssModel.R, ssModel.T)
+
+    # ###############################################################
     #
-    plt.plot(ssModel.x.squeeze(), label= 'Predicted signal', color = 'b')
+    # taylor_model = Taylor_model(taylor_order=5, window='rectangular', window_size=11)  # ,window_parameters=[1,5])
+    #
+    # taylor_model.fit(obs[:num_batches, 0, :])
+    # #
+    # ssModel1 = taylor_model.GetSysModel()
+    # ssModel1.InitSequence(obs[-1, 0, 0], torch.eye(1))
+    # ssModel1.GenerateSequence(ssModel.Q, ssModel.R, ssModel.T)
+    #
+    # ###############################################################
+    #
+    # taylor_model = Taylor_model(taylor_order=5, window='exponential', window_size=11 ,window_parameters=0.7)
+    #
+    # taylor_model.fit(obs[:num_batches, 0, :])
+    # #
+    # ssModel2 = taylor_model.GetSysModel()
+    # ssModel2.InitSequence(obs[-1, 0, 0], torch.eye(1))
+    # ssModel2.GenerateSequence(ssModel.Q, ssModel.R, ssModel.T)
+
+    ###############################################################
+
+    EM = EM_algorithm(ssModel,Plot_title= 'SNR: {} [dB]'.format(snr), units= 'mV', parameters=[])
+    # # #
+    shift = 0
+    shift_obs = torch.roll(obs[-3,0],shift)
+    shift_state = torch.roll(state[-3,0],shift)
+    filtered_states, loss = EM.EM(shift_obs,shift_state,num_itts=50, r_2=0.01, q_2= 0.001,Plot='_SNR_{}_Taylor'.format(snr))
+
+
+    last_loss = round(loss[-1],2)
+    #
+    lower_window = 0
+    upper_window = -1
+    #
+    plt.plot(filtered_states.squeeze()[lower_window:upper_window], label= 'Predicted signal {} window'.format(taylor_model.window) , color = 'b')
+    # plt.plot(ssModel1.x.squeeze()[lower_window:upper_window], label= 'Predicted signal rectangular', color = 'r')
+    # plt.plot(ssModel2.x.squeeze()[lower_window:upper_window], label= 'Predicted signal exponential', color = 'g')
+    plt.plot(state[-3,0,lower_window:upper_window].squeeze(), label = 'Ground truth',color= 'g')
+    plt.plot(obs[-3,0,lower_window:upper_window].squeeze(), label = 'Observation, SNR: {}[dB]'.format(snr), color = 'r',alpha=0.3)
     plt.ylabel('Amplitude [mV]')
     plt.xlabel('Time-steps')
     plt.title('Generated signal from learned weights, given {} centered heartbeats'.format(num_batches))
-    plt.savefig('..\\Plots\\Taylor_models\\sample_prior_{}.pdf'.format(num_batches))
+    plt.legend()
+    plt.savefig('..\\Plots\\Taylor_models\\sample_prior_batches_{}_windowType_{}_window_size_{}_window_param_{}_loss_{}.pdf'
+                .format(num_batches,taylor_model.window,taylor_model.window_size , taylor_model.window_parameters,last_loss))
     plt.show()
-    #
+
     #
     # ssModel = taylor_model.GetSysModel()
     # ssModel.InitSequence(torch.ones((1)) , torch.eye(1))
 
-    taylor_model1 = Taylor_model(taylor_order=5)#, window='gaussian', window_size=19)  # ,window_parameters=[1,10])
-
-    taylor_model1.fit(obs[:num_batches, 0, :])
+    # taylor_model1 = Taylor_model(taylor_order=5)#, window='gaussian', window_size=19)  # ,window_parameters=[1,10])
+    #
+    # taylor_model1.fit(obs[:num_batches, 0, :])
 
     # print(torch.max(state[:,0,:],1).values.mean())
-    print(ssModel.x.max() / torch.max(state[:,0,:],1).values.mean())
+    # print(ssModel.x.max() / torch.max(state[0,0,:]))
     # #
     # #
-    # EM = EM_algorithm(ssModel,Plot_title= 'SNR: {} [dB]'.format(snr), units= 'mV', parameters=['R'])
-    # # #
-    # EM.EM(obs[-1,0,:],state[-1,0,:],num_itts=20, q_2= 0.001,Plot='_SNR_{}_Taylor'.format(snr))
 

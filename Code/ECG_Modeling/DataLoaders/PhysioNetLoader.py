@@ -18,14 +18,19 @@ class PhyioNetLoader_AbdominalAndDirect(Dataset):
     def __init__(self):
         super(PhyioNetLoader_AbdominalAndDirect, self).__init__()
 
-        edf_files = glob.glob('..\\Datasets\\PhysioNet\\abdominal-and-direct-fetal\\*.edf')
-        self.datasets = [mne.io.read_raw_edf(edf_file) for edf_file in edf_files]
+        self.file_location = os.path.dirname(os.path.realpath(__file__))
 
-        test = mne.io.read_raw_edf('..\\Datasets\\PhysioNet\\abdominal-and-direct-fetal\\ANNOTATORS.edf')
+        edf_files = glob.glob(self.file_location+'\\..\\Datasets\\PhysioNet\\abdominal-and-direct-fetal\\*.edf')
+        self.files = [mne.io.read_raw_edf(edf_file) for edf_file in edf_files]
+
+        self.dataset = torch.tensor(np.array([file.get_data() for file in self.files]), dtype=torch.float32).mT
+        # self.labels = torch.tensor(np.array([file.sample for file in self.annotation]), dtype=torch.float32)[0, 1:]
+
+        # test = mne.io.read_raw_edf(self.file_location+'\\..\\Datasets\\PhysioNet\\abdominal-and-direct-fetal\\ANNOTATORS.edf')
 
     def PlotSample(self, length):
-        plt.plot(self.datasets[0].get_data()[1:, :2000].mean(0), label='mean')
-        plt.plot(self.datasets[0].get_data()[0, :2000], label='gt')
+        plt.plot(self.dataset[0, 11000:15000,1:].squeeze(), label='mean')
+        # plt.plot(self.datasets[0].get_data()[0, :2000], label='gt')
         plt.legend()
         plt.show()
 
@@ -48,7 +53,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
     def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = True):
         super(PhyioNetLoader_MIT_NIH, self).__init__()
-
+        torch.manual_seed(42)
         assert isinstance(num_samples,int), 'Number of samples must be an integer'
         assert isinstance(num_samples, int), 'Number of heartbeats must be an integer'
 
@@ -107,7 +112,13 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
             if lower_index >= 0 and upper_index < self.dataset.shape[-1]:
 
-                intermediate.append(self.dataset[:,:,lower_index:upper_index])
+                if self.num_samples > self.fs*self.num_beats:
+                    num_pad = int((self.num_samples-self.fs)/2)
+                    data = torch.nn.functional.pad(self.dataset[:,:,int(index)-int(self.fs/2):int(index) + int(self.fs/2)], (num_pad,num_pad),'replicate')
+                    intermediate.append(data)
+
+                else:
+                    intermediate.append(self.dataset[:,:,lower_index:upper_index])
 
             last_index = index
 
@@ -183,5 +194,19 @@ class PhyioNetLoader_MIT_NIH(Dataset):
     def GetData(self,num_batches):
         return self.noisy_dataset[:num_batches], self.centerd_data[:num_batches]
 
+    def GetRolledData(self,num_batches,max_roll = 10):
+
+        shift_obs = torch.empty((num_batches, self.noisy_dataset.shape[-2], self.noisy_dataset.shape[-1]))
+        shift_state = torch.empty((num_batches, self.centerd_data.shape[-2],self.centerd_data.shape[-1]))
+
+        for t in range(num_batches):
+            shift = int(torch.randint(low=-max_roll, high=max_roll, size= (1,)))
+            shift_obs[t] = torch.roll(self.noisy_dataset[t], shift)
+            shift_state[t] = torch.roll(self.centerd_data[t], shift)
+
+        return shift_obs, shift_state
+
+
 if __name__ == '__main__':
-    dataset = PhyioNetLoader_MIT_NIH(4, 2, 10)
+    dataset = PhyioNetLoader_AbdominalAndDirect()
+    dataset.PlotSample(100)
