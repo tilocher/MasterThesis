@@ -17,7 +17,7 @@ from Code.ECG_Modeling.Filters.EKF import ExtendedKalmanFilter
 
 class EM_algorithm():
 
-    def __init__(self,ssModel: SystemModel, parameters: list = ('R'), **kwargs):
+    def __init__(self,ssModel: SystemModel, parameters: list = ('R','mu','Sigma'), **kwargs):
 
         self.ssModel = ssModel
         self.m = ssModel.m
@@ -180,7 +180,7 @@ class EM_algorithm():
 
                 V_xx = (E_xx[:-1,:,:] + error_cov[:-1,:,:])
                 V_x1x1 = (E_xx[1:,:,:] + error_cov[1:,:,:])
-                V_x1x = torch.bmm(filtered_states[1:],filtered_states[:-1].mT) + SGs
+                V_x1x = torch.bmm(filtered_states[1:],filtered_states[:-1].mT) + SGs[:-1]
 
                 if 'A' in self.parameters or 'Q' in self.parameters:
 
@@ -194,15 +194,24 @@ class EM_algorithm():
 
                     if 'Q' in self.parameters and 'A' in self.parameters:
                         Q = (V_x1x1 - torch.bmm(A,V_x1x.mT)).mean(0)# - V_x1x.mean(-1).T + V_xx.mean(-1)) #(V_x1x1 - torch.bmm(A.T,V_x1x.T).T).mean()
+
                     elif 'Q' in self.parameters and 'A' not in self.parameters:
                         A = self.ssModel.FJac(filtered_states, 0).repeat(T-1, 1, 1)
                         Q = (V_x1x1 - torch.bmm(A,V_x1x.mT) -  torch.bmm(V_x1x,A.mT) + torch.bmm(torch.bmm(A,V_xx),A.mT))
                         self.ssModel.SetQ_array(torch.cat((torch.eye(self.m).unsqueeze(0), Q)))
 
-                # if torch.any(torch.abs(torch.linalg.eigvals(Q)) < 0 ):
-                #     print('noonononono')
 
-                self.ssModel.InitSequence(filtered_states[0], error_cov[0])
+                if 'Sigma' in self.parameters:
+                    next_init_cov = error_cov[0]
+                else:
+                    next_init_cov = self.ssModel.m2x_0
+
+                if 'mu' in self.parameters:
+                    next_init_mean = filtered_states[0]
+                else:
+                    next_init_mean = self.ssModel.m1x_0
+
+                self.ssModel.InitSequence(next_init_mean, next_init_cov)
 
                 if loss != None:
                     losses.append(10*torch.log10(loss.mean()).item())

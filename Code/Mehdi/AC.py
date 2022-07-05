@@ -384,11 +384,13 @@ loader = PhyioNetLoader_MIT_NIH(num_sets=1,num_beats=1,num_samples=512,SNR_dB= 6
 
 num_batches = 1000
 
+
+obs_non_roll,trin_non_roll = loader.GetData(num_batches)
 obs,state = loader.GetRolledData(num_batches,max_roll=50)
 
 split = int(0.8*num_batches)
-obs_train = obs[:split].unsqueeze(-1).numpy()
-state_train = state[:split].unsqueeze(-1).numpy()
+obs_train = obs_non_roll[:split].unsqueeze(-1).numpy()
+state_train = trin_non_roll[:split].unsqueeze(-1).numpy()
 
 obs_test = obs[split:].unsqueeze(-1).numpy()
 state_test = state[split:].unsqueeze(-1).numpy()

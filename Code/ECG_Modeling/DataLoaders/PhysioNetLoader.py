@@ -100,6 +100,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         last_index = 0
 
+        self.num_pad = []
+
         for i, index in enumerate(beat_indices_last):
 
             if self.num_beats == 1:
@@ -114,6 +116,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
                 if self.num_samples > self.fs*self.num_beats:
                     num_pad = int((self.num_samples-self.fs)/2)
+                    self.num_pad.append([num_pad,num_pad])
                     data = torch.nn.functional.pad(self.dataset[:,:,int(index)-int(self.fs/2):int(index) + int(self.fs/2)], (num_pad,num_pad),'replicate')
                     intermediate.append(data)
 
