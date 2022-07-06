@@ -16,7 +16,6 @@ class ECG_AE_Pipeline(Pipeline):
 
 
     def InitModel(self,**kwargs):
-
         pass
 
     def Run_Inference(self,input,target,**kwargs):
@@ -52,9 +51,9 @@ if __name__ == '__main__':
 
     ECG_Pipeline = ECG_AE_Pipeline()
     ECG_Pipeline.setModel(nnModel)
-    ECG_Pipeline.setTrainingParams()
+    ECG_Pipeline.setTrainingParams(learningRate=0.1)
 
 
-    ECG_Pipeline.NNTrain(loader)
+    ECG_Pipeline.NNTrain(loader,epochs= 20)
 
 

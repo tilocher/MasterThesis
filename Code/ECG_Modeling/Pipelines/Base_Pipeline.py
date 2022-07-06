@@ -18,7 +18,7 @@ import shutil
 import psutil
 
 from tensorboard import program
-
+import atexit
 
 class Pipeline():
 
@@ -42,19 +42,18 @@ class Pipeline():
 
         self.writer = SummaryWriter(self.RunFolderName + self.RunFileName)
 
+        atexit.register(self.EndOfScript)
 
 
+    def EndOfScript(self):
+        input('Script completed press "Enter" twice to close TensorBoard server')
 
     def LaunchTensorBoard(self):
 
         tb = program.TensorBoard()
-        tb.configure(argv=[None, '--logdir', self.RunFolderName])
+        tb.configure(argv=[None, '--logdir','runs'])# self.RunFolderName[:-1]])
         url = tb.launch()
         print(f'Tensorboard listening on {url}')
-
-        self.TensorBoard_Port = int(''.join([n for n in url if n.isdigit()]))
-
-
 
 
     def ManageFiles(self):
@@ -118,22 +117,15 @@ class Pipeline():
         # optimizer which Tensors it should update.
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learningRate, weight_decay=self.weightDecay)
 
-        self.writer.add_hparams(
-            {'lr':self.learningRate,
-             'BatchSize': self.N_B,
-             'Shuffle': self.shuffle,
-             'Train/CV Split Ratio ': self.split_ratio,
-             'Loss Function': str(self.loss_fn),
-             'L2': self.weightDecay,
-             'Optimizer': 'ADAM'},{})
+        self.HyperParameters =  {'lr': self.learningRate,
+                 'BatchSize': self.N_B,
+                 'Shuffle': str(self.shuffle),
+                 'Train/CV Split Ratio ': self.split_ratio,
+                 'Loss Function': str(self.loss_fn),
+                 'L2': self.weightDecay,
+                 'Optimizer': 'ADAM'}
 
-    def ForceExit(self):
-        self.writer.close()
-        force_close_port(self.TensorBoard_Port)
-        if self.modelFileName in os.listdir(self.modelFolderName): os.remove(self.modelFolderName + self.modelFileName)
-        if self.RunFileName in os.listdir(self.RunFolderName): shutil.rmtree(self.RunFolderName + self.RunFileName)
-        if self.PipelineFileName in os.listdir(self.PipelineFolderName): os.remove(
-            self.PipelineFolderName + self.PipelineFileName)
+
 
     def InitModel(self,**kwargs):
         raise NotImplementedError('Methode needs to be implemented outside of base-class')
@@ -141,22 +133,41 @@ class Pipeline():
     def Run_Inference(self,input,target,**kwargs):
         raise NotImplementedError('Methode needs to be implemented outside of base-class')
 
+    def ForceExit(self):
+        self.writer.close()
+        if self.modelFileName in os.listdir(self.modelFolderName): os.remove(self.modelFolderName + self.modelFileName)
+        if self.RunFileName in os.listdir(self.RunFolderName): shutil.rmtree(self.RunFolderName + self.RunFileName)
+        if self.PipelineFileName in os.listdir(self.PipelineFolderName): os.remove(
+            self.PipelineFolderName + self.PipelineFileName)
+
     def NNTrain(self, DataSet, epochs=None, **kwargs):
 
         try:
             self._NNTrain(DataSet,epochs,**kwargs)
-        except:
+            self.writer.add_hparams(self.HyperParameters
+               , {'CV Loss [dB]':self.MSE_cv_dB_epoch[self.MSE_cv_idx_opt]})
+        except ModelInitError as msg:
             self.ForceExit()
+            raise ModelInitError(msg)
+        except InferenceError as msg:
+            self.ForceExit()
+            raise InferenceError(msg)
+        except KeyboardInterrupt:
+            self.ForceExit()
+            raise KeyboardInterrupt()
+
+
 
     def _NNTrain(self, DataSet, epochs=None, **kwargs):
 
         DataSet_length = len(DataSet)
 
+        self.HyperParameters.update({'Dataset Samples':DataSet_length})
+
         N_train = int(self.split_ratio * DataSet_length)
         N_CV = DataSet_length - N_train
 
 
-        print(okk)
 
         self.MSE_cv_linear_epoch = torch.empty([self.N_Epochs], requires_grad=False).to(self.dev, non_blocking=True)
         self.MSE_cv_dB_epoch = torch.empty([self.N_Epochs], requires_grad=False).to(self.dev, non_blocking=True)
@@ -169,7 +180,7 @@ class Pipeline():
         ##############
 
         MSE_cv_dB_opt = 1000
-        MSE_cv_idx_opt = 0
+        self.MSE_cv_idx_opt = 0
 
         if epochs is None:
             N = self.N_Epochs
@@ -182,10 +193,11 @@ class Pipeline():
 
         Epoch_itter = trange(N)
 
+        Train_Dataset, CV_Dataset = torch.utils.data.random_split(DataSet, [N_train, N_CV],
+                                                                  generator=torch.Generator(device=self.dev))
+
         for ti in Epoch_itter:
 
-            Train_Dataset, CV_Dataset = torch.utils.data.random_split(DataSet, [N_train, N_CV],
-                                                                      generator=torch.Generator(device=self.dev))
 
             #################################
             ### Validation Sequence Batch ###
@@ -198,14 +210,15 @@ class Pipeline():
 
             try:
                 self.InitModel(**kwargs)
-            except:
-                raise ModelInitError()
+
+            except Exception as msg:
+                raise ModelInitError(msg)
 
             for cv_input, cv_target in CV_Dataloader:
                 try:
                     Inference_out, cv_loss = self.Run_Inference(cv_input, cv_target, **kwargs)
-                except:
-                    raise InferenceError()
+                except Exception as msg:
+                    raise InferenceError(msg)
 
                 self.MSE_train_linear_epoch[ti] = cv_loss.detach()
                 self.MSE_cv_dB_epoch[ti] = 10 * torch.log10(cv_loss).detach()
@@ -215,6 +228,7 @@ class Pipeline():
             if (self.MSE_cv_dB_epoch[ti] < MSE_cv_dB_opt):
 
                 MSE_cv_dB_opt = self.MSE_cv_dB_epoch[ti]
+                self.MSE_cv_idx_opt = ti
 
                 torch.save(self.model, self.modelFolderName + self.modelFileName)
 
@@ -229,8 +243,8 @@ class Pipeline():
                                           generator=torch.Generator(device=self.dev))
             try:
                 self.InitModel(**kwargs)
-            except:
-                raise ModelInitError()
+            except Exception as msg:
+                raise ModelInitError(msg)
 
             MSE_train_linear_batch = torch.empty(Train_DataLoader.__len__(), device=self.dev, requires_grad=False)
 
@@ -238,8 +252,8 @@ class Pipeline():
 
                 try:
                     Inference_out, train_loss = self.Run_Inference(train_input, train_target, **kwargs)
-                except:
-                    raise InferenceError()
+                except Exception as msg:
+                    raise InferenceError(msg)
 
                 MSE_train_linear_batch[j] = train_loss
 
@@ -275,35 +289,12 @@ class Pipeline():
         return [self.MSE_cv_linear_epoch, self.MSE_cv_dB_epoch, self.MSE_train_linear_epoch, self.MSE_train_dB_epoch]
 
 
-
-def force_close_port(port, process_name=None):
-    """Terminate a process that is bound to a port.
-
-    The process name can be set (eg. python), which will
-    ignore any other process that doesn't start with it.
-    """
-    for proc in psutil.process_iter():
-        for conn in proc.connections():
-            if conn.laddr[1] == port:
-
-                try:
-                    proc.username()
-                except psutil.AccessDenied:
-                    pass
-                else:
-                    if process_name is None or proc.name().startswith(process_name):
-                        try:
-                            proc.kill()
-                        except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            pass
-
-
 class ModelInitError(Exception):
 
-    def __init__(self):
-        super(ModelInitError, self).__init__('Error in the Model Initialization function')
+    def __init__(self, msg):
+        super(ModelInitError, self).__init__(msg)
 
 class InferenceError(Exception):
 
-    def __init__(self):
-        super(InferenceError, self).__init__('Error in the Inference function')
+    def __init__(self,msg):
+        super(InferenceError, self).__init__(msg)

@@ -4,12 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d12d40bb-4d32-4d02-a40d-1fa34b7862aa" name="Changes" comment="EM and taylor working (finnaly)">
-      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/AutoEncoder_Pipeline.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/Base_Pipeline.py" afterDir="false" />
+    <list default="true" id="d12d40bb-4d32-4d02-a40d-1fa34b7862aa" name="Changes" comment="AutoEncoder on torch">
+      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/MasterThesis.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/MasterThesis.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders/PhysioNetLoader.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders/PhysioNetLoader.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/NN/AutoEncoder.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/NN/AutoEncoder.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/AutoEncoder_Pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/AutoEncoder_Pipeline.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/Base_Pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/Base_Pipeline.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -36,11 +37,11 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/Code/ECG_Modeling/SystemModels/Extended_sysmdl.py" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Filters/RTS_Smoother_test.py" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Code/ECG_Modeling/SystemModels/ECG_model.py" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Filters/EKF_test.py" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/LS_Taylor.py" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Code/ECG_Modeling/Filters/Extended_RTS_Smoother.py" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Filters/RTS_Smoother_test.py" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Code/ECG_Modeling/SystemModels/ECG_model.py" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
@@ -59,10 +60,10 @@
     <property name="WebServerToolWindowPanel.toolwindow.show.date" value="false" />
     <property name="WebServerToolWindowPanel.toolwindow.show.permissions" value="false" />
     <property name="WebServerToolWindowPanel.toolwindow.show.size" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/Code/ECG_Modeling/Plots" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
-    <property name="settings.editor.selected.configurable" value="build.tools" />
+    <property name="settings.editor.selected.configurable" value="preferences.keymap" />
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
@@ -121,9 +122,9 @@
       <envs>
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
-      <option name="SDK_HOME" value="" />
+      <option name="SDK_HOME" value="C:\Users\Timur\Desktop\MasterThesis\venv\Scripts\python.exe" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines" />
-      <option name="IS_MODULE_SDK" value="true" />
+      <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
@@ -283,6 +284,9 @@
       <workItem from="1657107270942" duration="39000" />
       <workItem from="1657107318890" duration="594000" />
       <workItem from="1657107924140" duration="48000" />
+      <workItem from="1657107981837" duration="144000" />
+      <workItem from="1657108393723" duration="1929000" />
+      <workItem from="1657111531679" duration="9828000" />
     </task>
     <task id="LOCAL-00001" summary="Added ECG model for evolution learning and LS Taylor model">
       <created>1655397551914</created>
@@ -347,7 +351,14 @@
       <option name="project" value="LOCAL" />
       <updated>1657012424168</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="AutoEncoder on torch">
+      <created>1657108078890</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1657108078890</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -373,7 +384,8 @@
     <MESSAGE value="regular EM + taylor model working" />
     <MESSAGE value="AE, Taylor" />
     <MESSAGE value="EM and taylor working (finnaly)" />
-    <option name="LAST_COMMIT_MESSAGE" value="EM and taylor working (finnaly)" />
+    <MESSAGE value="AutoEncoder on torch" />
+    <option name="LAST_COMMIT_MESSAGE" value="AutoEncoder on torch" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -533,16 +545,6 @@
           <line>296</line>
           <option name="timeStamp" value="827" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/Base_Pipeline.py</url>
-          <line>199</line>
-          <option name="timeStamp" value="830" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/Base_Pipeline.py</url>
-          <line>197</line>
-          <option name="timeStamp" value="831" />
-        </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
         <breakpoint type="python-exception">
@@ -558,7 +560,7 @@
     <SUITE FILE_PATH="coverage/MasterThesis$main_linear.coverage" NAME="main_linear Coverage Results" MODIFIED="1655274200465" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
     <SUITE FILE_PATH="coverage/MasterThesis$PhysioNetLoader.coverage" NAME="PhysioNetLoader Coverage Results" MODIFIED="1656887916442" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders" />
     <SUITE FILE_PATH="coverage/MasterThesis$ECG_model__1_.coverage" NAME="ECG_model (1) Coverage Results" MODIFIED="1655793441160" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/SystemModels" />
-    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Pipeline.coverage" NAME="AutoEncoder_Pipeline Coverage Results" MODIFIED="1657107957221" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines" />
+    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Pipeline.coverage" NAME="AutoEncoder_Pipeline Coverage Results" MODIFIED="1657122691443" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines" />
     <SUITE FILE_PATH="coverage/MasterThesis$Model_testing_main.coverage" NAME="Model_testing_main Coverage Results" MODIFIED="1656662994334" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
     <SUITE FILE_PATH="coverage/MasterThesis$ARIMA.coverage" NAME="ARIMA Coverage Results" MODIFIED="1654634163838" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
     <SUITE FILE_PATH="coverage/MasterThesis$Taylor_model.coverage" NAME="Taylor_model Coverage Results" MODIFIED="1657011575054" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
