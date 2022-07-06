@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     ECG_Pipeline = ECG_AE_Pipeline()
     ECG_Pipeline.setModel(nnModel)
-    ECG_Pipeline.setTrainingParams(learningRate=0.1)
+    ECG_Pipeline.setTrainingParams(weightDecay=0.8)
 
 
     ECG_Pipeline.NNTrain(loader,epochs= 20)

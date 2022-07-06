@@ -145,7 +145,8 @@ class Pipeline():
         try:
             self._NNTrain(DataSet,epochs,**kwargs)
             self.writer.add_hparams(self.HyperParameters
-               , {'CV Loss [dB]':self.MSE_cv_dB_epoch[self.MSE_cv_idx_opt]})
+               , {'CV Loss [dB]':self.MSE_cv_dB_epoch[self.MSE_cv_idx_opt]},
+                                    run_name= self.RunFolderName + self.RunFileName)
         except ModelInitError as msg:
             self.ForceExit()
             raise ModelInitError(msg)
