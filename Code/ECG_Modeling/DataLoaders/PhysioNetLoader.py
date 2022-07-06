@@ -51,7 +51,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         and: https://archive.physionet.org/physiobank/database/mitdb/
     '''
 
-    def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = True):
+    def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = True,
+                 gpu = False, plot_sample = True, desired_shape = None):
         super(PhyioNetLoader_MIT_NIH, self).__init__()
         torch.manual_seed(42)
         assert isinstance(num_samples,int), 'Number of samples must be an integer'
@@ -64,6 +65,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         self.num_samples = num_samples
 
         self.file_location = os.path.dirname(os.path.realpath(__file__))
+
+        self.gpu = gpu
 
 
         header_files = glob.glob(self.file_location + '\\..\\Datasets\\PhysioNet\\MIT-BIH_Arrhythmia_Database\\*.hea')
@@ -88,8 +91,15 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         self.Center()
 
         self.AddGaussianNoise(SNR_dB)
+        if plot_sample:
+            self.PlotSample()
 
-        self.PlotSample()
+        if desired_shape != None:
+
+            self.centerd_data = self.centerd_data.reshape((-1,) + desired_shape)
+            self.noisy_dataset = self.noisy_dataset.reshape((-1,) + desired_shape)
+
+
 
     def Center(self):
 
@@ -163,7 +173,9 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         print('SNR of actual signal', round( ( signal_power_dB - noise_power_num).mean().item(), 3), '[dB]')
 
         noisy_sample = signals + noise
-
+        if self.gpu == True:
+            noisy_sample = noisy_sample.to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
+            self.centerd_data = self.centerd_data.to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
         self.noisy_dataset = noisy_sample
 
     def PlotSample(self) -> None:
