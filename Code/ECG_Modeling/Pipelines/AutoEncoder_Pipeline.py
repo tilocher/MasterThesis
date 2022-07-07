@@ -9,9 +9,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 class ECG_AE_Pipeline(Pipeline):
 
-    def __init__(self):
+    def __init__(self,**kwargs):
 
-        super(ECG_AE_Pipeline, self).__init__('ECG_AutoEncoder')
+        super(ECG_AE_Pipeline, self).__init__('ECG_AutoEncoder',**kwargs)
 
 
 
@@ -49,11 +49,13 @@ if __name__ == '__main__':
                         latent_space_dim = LATENT_SPACE)
 
 
-    ECG_Pipeline = ECG_AE_Pipeline()
+    ECG_Pipeline = ECG_AE_Pipeline(hyperP= {'LatentSpace': LATENT_SPACE, 'NumChannels': 2})
     ECG_Pipeline.setModel(nnModel)
-    ECG_Pipeline.setTrainingParams(weightDecay=0.8)
+    ECG_Pipeline.setTrainingParams(weightDecay=1e-6)
 
 
-    ECG_Pipeline.NNTrain(loader,epochs= 20)
+    ECG_Pipeline.NNTrain(loader,epochs= 100)
+
+    ECG_Pipeline.NNTest(loader)
 
 

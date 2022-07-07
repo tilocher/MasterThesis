@@ -5,6 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d12d40bb-4d32-4d02-a40d-1fa34b7862aa" name="Changes" comment="Updated Pipeline">
+      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Logger/TensorBoard_BaseLogger.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Logger/WB_BaseLogger.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/AutoEncoder_Pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/AutoEncoder_Pipeline.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/Base_Pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/Base_Pipeline.py" afterDir="false" />
@@ -67,7 +69,7 @@
       <recent name="C:\Users\Timur\Desktop\MasterThesis\Code\ECG_Modeling" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.AutoEncoder_Pipeline">
+  <component name="RunManager" selected="Python.WB_BaseLogger">
     <configuration name="AC" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="MasterThesis" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -134,7 +136,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="PhysioNetLoader" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="TensorBoard_BaseLogger" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="MasterThesis" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -142,12 +144,12 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/Logger" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders/PhysioNetLoader.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/Logger/TensorBoard_BaseLogger.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -156,7 +158,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="Taylor_model" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="WB_BaseLogger" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="MasterThesis" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -164,12 +166,12 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/ECG_Modeling/Logger" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/Filters/Taylor_model.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/ECG_Modeling/Logger/WB_BaseLogger.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -202,19 +204,19 @@
     </configuration>
     <list>
       <item itemvalue="Python.main_FH_learn" />
-      <item itemvalue="Python.Taylor_model" />
       <item itemvalue="Python.AC" />
-      <item itemvalue="Python.PhysioNetLoader" />
       <item itemvalue="Python.AutoEncoder" />
       <item itemvalue="Python.AutoEncoder_Pipeline" />
+      <item itemvalue="Python.TensorBoard_BaseLogger" />
+      <item itemvalue="Python.WB_BaseLogger" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.WB_BaseLogger" />
         <item itemvalue="Python.AutoEncoder_Pipeline" />
+        <item itemvalue="Python.TensorBoard_BaseLogger" />
         <item itemvalue="Python.AutoEncoder" />
         <item itemvalue="Python.AC" />
-        <item itemvalue="Python.Taylor_model" />
-        <item itemvalue="Python.PhysioNetLoader" />
       </list>
     </recent_temporary>
   </component>
@@ -284,6 +286,7 @@
       <workItem from="1657107981837" duration="144000" />
       <workItem from="1657108393723" duration="1929000" />
       <workItem from="1657111531679" duration="10507000" />
+      <workItem from="1657201108983" duration="16200000" />
     </task>
     <task id="LOCAL-00001" summary="Added ECG model for evolution learning and LS Taylor model">
       <created>1655397551914</created>
@@ -550,6 +553,11 @@
           <line>296</line>
           <option name="timeStamp" value="827" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/ECG_Modeling/Pipelines/Base_Pipeline.py</url>
+          <line>294</line>
+          <option name="timeStamp" value="862" />
+        </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
         <breakpoint type="python-exception">
@@ -562,28 +570,30 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/MasterThesis$main_KNet_linear.coverage" NAME="main_KNet_linear Coverage Results" MODIFIED="1651935033856" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Unsupervised_EUSIPCO_22" />
-    <SUITE FILE_PATH="coverage/MasterThesis$main_linear.coverage" NAME="main_linear Coverage Results" MODIFIED="1655274200465" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
-    <SUITE FILE_PATH="coverage/MasterThesis$PhysioNetLoader.coverage" NAME="PhysioNetLoader Coverage Results" MODIFIED="1656887916442" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders" />
     <SUITE FILE_PATH="coverage/MasterThesis$ECG_model__1_.coverage" NAME="ECG_model (1) Coverage Results" MODIFIED="1655793441160" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/SystemModels" />
-    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Pipeline.coverage" NAME="AutoEncoder_Pipeline Coverage Results" MODIFIED="1657123220334" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines" />
     <SUITE FILE_PATH="coverage/MasterThesis$Model_testing_main.coverage" NAME="Model_testing_main Coverage Results" MODIFIED="1656662994334" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
     <SUITE FILE_PATH="coverage/MasterThesis$ARIMA.coverage" NAME="ARIMA Coverage Results" MODIFIED="1654634163838" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
-    <SUITE FILE_PATH="coverage/MasterThesis$Taylor_model.coverage" NAME="Taylor_model Coverage Results" MODIFIED="1657011575054" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
-    <SUITE FILE_PATH="coverage/MasterThesis$tmp.coverage" NAME="tmp Coverage Results" MODIFIED="1655374653225" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
     <SUITE FILE_PATH="coverage/MasterThesis$AC.coverage" NAME="AC Coverage Results" MODIFIED="1657030892893" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Mehdi" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_ECG.coverage" NAME="main_ECG Coverage Results" MODIFIED="1652442931323" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
-    <SUITE FILE_PATH="coverage/MasterThesis$Pipeline_ECGModel.coverage" NAME="Pipeline_ECGModel Coverage Results" MODIFIED="1653990805593" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines" />
     <SUITE FILE_PATH="coverage/MasterThesis$ARIMA_improved.coverage" NAME="ARIMA_improved Coverage Results" MODIFIED="1654694227513" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
-    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder.coverage" NAME="AutoEncoder Coverage Results" MODIFIED="1657034082436" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/NN" />
-    <SUITE FILE_PATH="coverage/MasterThesis$PartialECGModel.coverage" NAME="PartialECGModel Coverage Results" MODIFIED="1653818490345" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels" />
     <SUITE FILE_PATH="coverage/MasterThesis$Ploting_results.coverage" NAME="Ploting_results Coverage Results" MODIFIED="1656457743528" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Plots" />
     <SUITE FILE_PATH="coverage/MasterThesis$ECG_model.coverage" NAME="ECG_model Coverage Results" MODIFIED="1655126671876" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels" />
-    <SUITE FILE_PATH="coverage/MasterThesis$LS_Taylor.coverage" NAME="LS_Taylor Coverage Results" MODIFIED="1655899170381" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
     <SUITE FILE_PATH="coverage/MasterThesis$EM.coverage" NAME="EM Coverage Results" MODIFIED="1655986139383" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
-    <SUITE FILE_PATH="coverage/MasterThesis$Comparison.coverage" NAME="Comparison Coverage Results" MODIFIED="1656413773154" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
-    <SUITE FILE_PATH="coverage/MasterThesis$ConstantModels.coverage" NAME="ConstantModels Coverage Results" MODIFIED="1656494092506" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_FH_learn.coverage" NAME="main_FH_learn Coverage Results" MODIFIED="1652188126187" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_ARMA.coverage" NAME="main_ARMA Coverage Results" MODIFIED="1654336624598" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
+    <SUITE FILE_PATH="coverage/MasterThesis$WB_BaseLogger.coverage" NAME="WB_BaseLogger Coverage Results" MODIFIED="1657229050182" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Logger" />
+    <SUITE FILE_PATH="coverage/MasterThesis$main_linear.coverage" NAME="main_linear Coverage Results" MODIFIED="1655274200465" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
+    <SUITE FILE_PATH="coverage/MasterThesis$PhysioNetLoader.coverage" NAME="PhysioNetLoader Coverage Results" MODIFIED="1656887916442" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders" />
+    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Pipeline.coverage" NAME="AutoEncoder_Pipeline Coverage Results" MODIFIED="1657226084210" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Pipelines" />
+    <SUITE FILE_PATH="coverage/MasterThesis$Taylor_model.coverage" NAME="Taylor_model Coverage Results" MODIFIED="1657011575054" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
+    <SUITE FILE_PATH="coverage/MasterThesis$tmp.coverage" NAME="tmp Coverage Results" MODIFIED="1655374653225" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
+    <SUITE FILE_PATH="coverage/MasterThesis$TensorBoard_BaseLogger.coverage" NAME="TensorBoard_BaseLogger Coverage Results" MODIFIED="1657206283982" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Logger" />
+    <SUITE FILE_PATH="coverage/MasterThesis$Pipeline_ECGModel.coverage" NAME="Pipeline_ECGModel Coverage Results" MODIFIED="1653990805593" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines" />
+    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder.coverage" NAME="AutoEncoder Coverage Results" MODIFIED="1657034082436" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/NN" />
+    <SUITE FILE_PATH="coverage/MasterThesis$PartialECGModel.coverage" NAME="PartialECGModel Coverage Results" MODIFIED="1653818490345" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/SystemModels" />
+    <SUITE FILE_PATH="coverage/MasterThesis$LS_Taylor.coverage" NAME="LS_Taylor Coverage Results" MODIFIED="1655899170381" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
+    <SUITE FILE_PATH="coverage/MasterThesis$Comparison.coverage" NAME="Comparison Coverage Results" MODIFIED="1656413773154" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
+    <SUITE FILE_PATH="coverage/MasterThesis$ConstantModels.coverage" NAME="ConstantModels Coverage Results" MODIFIED="1656494092506" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
     <SUITE FILE_PATH="coverage/MasterThesis$Model_testin_main.coverage" NAME="Model_testin_main Coverage Results" MODIFIED="1656503580932" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
   </component>
 </project>
