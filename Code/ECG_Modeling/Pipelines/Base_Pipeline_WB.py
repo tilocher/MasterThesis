@@ -5,19 +5,20 @@ from datetime import datetime as dt
 import os
 
 import torch
+import wandb
 from torch import nn
 from torch.utils.data.dataloader import DataLoader
-from Code.ECG_Modeling.Logger.TensorBoard_BaseLogger import TensorBoard_BaseLogger
+from Code.ECG_Modeling.Logger.WB_BaseLogger import WB_Logger
 from tqdm import trange
 import numpy as np
 
-class Pipeline(TensorBoard_BaseLogger):
+class Pipeline(WB_Logger):
 
-    def __init__(self, modelName, dev = 'gpu', **kwargs):
+    def __init__(self, modelName, dev = 'gpu', debug = False, **kwargs):
 
-        Logs = {'Models':'.pt', 'Pipelines':'.pt'}
+        Logs = {'Models':'.pt', 'Pipelines':'.pt','ONNX_models':'.onnx'}
 
-        super(Pipeline, self).__init__(modelName,Logs=Logs)
+        super(Pipeline, self).__init__(modelName,Logs=Logs,debug= debug)
 
         if torch.cuda.is_available() and dev == 'gpu':
             self.dev = torch.device("cuda:0")
@@ -31,9 +32,14 @@ class Pipeline(TensorBoard_BaseLogger):
         self.modelName = modelName
         self.Time = dt.now()
 
-        self.AdditionalHP = kwargs['hyperP'] if 'hyperP' in kwargs.keys() else {}
+        if 'hyperP' : self.HyperParameters = kwargs['hyperP']
 
+    def UpdateHyperParameters(self, HyperP):
 
+        if hasattr(self,'HyperParameters'):
+            self.HyperParameters.update(HyperP)
+        else:
+            self.HyperParameters = HyperP
 
     def save(self):
         torch.save(self, self.getSaveName('Pipelines'))
@@ -42,7 +48,10 @@ class Pipeline(TensorBoard_BaseLogger):
         self.ssModel = ssModel
 
     def setModel(self, model):
+
         self.model = model
+
+        if not self.debug: wandb.watch(self.model, log_freq = 10)
 
 
     def setTrainingParams(self, n_Epochs = 100, n_Batch = 32, learningRate = 1e-3,
@@ -64,15 +73,16 @@ class Pipeline(TensorBoard_BaseLogger):
         # optimizer which Tensors it should update.
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learningRate, weight_decay=self.weightDecay)
 
-        self.HyperParameters =  {'lr': self.learningRate,
-                 'BatchSize': self.N_B,
-                 'Shuffle': str(self.shuffle),
-                 'Train/CV Split Ratio ': self.Train_CV_split_ratio,
-                 'Loss Function': str(self.loss_fn),
-                 'L2': self.weightDecay,
-                 'Optimizer': 'ADAM'}
+        HyperP = {'lr': self.learningRate,
+                  'BatchSize': self.N_B,
+                  'Shuffle': str(self.shuffle),
+                  'Train\CV Split Ratio ': self.Train_CV_split_ratio,
+                  'Loss Function': str(self.loss_fn),
+                  'L2': self.weightDecay,
+                  'Optimizer': 'ADAM'}
 
-        self.HyperParameters.update(self.AdditionalHP)
+        self.UpdateHyperParameters(HyperP)
+
 
 
 
@@ -90,9 +100,8 @@ class Pipeline(TensorBoard_BaseLogger):
 
         try:
             self._NNTrain(DataSet,epochs,**kwargs)
-            self.writer.add_hparams(self.HyperParameters
-               , {'hparam/CV Loss [dB]':self.MSE_cv_dB_epoch[self.MSE_cv_idx_opt]},
-                                    run_name= self.getSaveName('run'))
+            if not self.debug:
+                wandb.config.update(self.HyperParameters)
         except:
             self.ForceClose()
             raise
@@ -117,8 +126,6 @@ class Pipeline(TensorBoard_BaseLogger):
         N_train = int(self.Train_CV_split_ratio * DataSet_length)
         N_CV = DataSet_length - N_train
 
-
-
         self.MSE_cv_linear_epoch = torch.empty([self.N_Epochs], requires_grad=False).to(self.dev, non_blocking=True)
         self.MSE_cv_dB_epoch = torch.empty([self.N_Epochs], requires_grad=False).to(self.dev, non_blocking=True)
 
@@ -140,8 +147,6 @@ class Pipeline(TensorBoard_BaseLogger):
         self.HyperParameters.update({'Epochs': N})
 
         sample_input, sample_target = DataSet[np.random.randint(0, len(DataSet))]
-
-        self.writer.add_graph(self.model, sample_input.unsqueeze(0))
 
         Epoch_itter = trange(N)
 
@@ -180,6 +185,9 @@ class Pipeline(TensorBoard_BaseLogger):
                 self.MSE_cv_idx_opt = ti
 
                 torch.save(self.model, self.getSaveName('Models'))
+
+                torch.onnx.export(self.model,cv_input,self.getSaveName('ONNX_models'))
+
 
             ###############################
             ### Training Sequence Batch ###
@@ -220,19 +228,24 @@ class Pipeline(TensorBoard_BaseLogger):
             Epoch_cv_loss_dB = 10 * np.log10(Epoch_cv_loss_lin)
             Epoch_train_loss_dB = 10 * np.log10(Epoch_train_loss_lin)
 
-            self.writer.add_scalar('Training Loss', Epoch_train_loss_lin, ti)
-            self.writer.add_scalar('CV Loss', Epoch_cv_loss_lin, ti)
+            if not self.debug:
 
-            self.writer.add_scalar('Training Loss [dB]', Epoch_train_loss_dB, ti)
-            self.writer.add_scalar('CV Loss [dB]', Epoch_cv_loss_dB, ti)
+                wandb.log({'Training Loss': Epoch_train_loss_lin,'CV Loss': Epoch_cv_loss_lin,
+                           'Training Loss [dB]': Epoch_train_loss_dB,'CV Loss [dB]': Epoch_cv_loss_dB
+                           })
+
 
             # Update Description
             train_desc = str(round(Epoch_train_loss_dB, 4))
             cv_desc = str(round(Epoch_cv_loss_dB, 4))
+            cv_best_desc = str(round(self.MSE_cv_dB_epoch[self.MSE_cv_idx_opt].item(),4))
             Epoch_itter.set_description(
-                'Epoch training Loss: {} [dB], Epoch Val. Loss: {} [dB], Best Val. Loss: {} [dB]'.format(train_desc, cv_desc,
-                                                                                                         self.MSE_cv_dB_epoch[self.MSE_cv_idx_opt]))
-
+                'Epoch training Loss: {} [dB], Epoch Val. Loss: {} [dB], Best Val. Loss: {} [dB]'.format(train_desc,
+                                                                                                         cv_desc,
+                                                                                                         cv_best_desc))
+        if not  self.debug:
+            wandb.save(self.getSaveName('ONNX_models'),policy = 'now')
+            wandb.save(self.getSaveName('Models'), policy = 'now')
 
         return [self.MSE_cv_linear_epoch, self.MSE_cv_dB_epoch, self.MSE_train_linear_epoch, self.MSE_train_dB_epoch]
 
@@ -246,10 +259,16 @@ class Pipeline(TensorBoard_BaseLogger):
 
         try:
             self._NNTest(DataSet,**kwargs)
-            self.writer.add_hparams(self.HyperParameters
-               , {'hparam/Test Loss [dB]':self.MSE_test_dB_avg},
-                                    run_name= self.getSaveName('run'))
-            self.writer.add_histogram('Linear Test Loss Distribution',self.MSE_test_linear_arr)
+
+            if not self.debug:
+                wandb.config.update(self.HyperParameters)
+
+                intermediate = 10*torch.log10(self.MSE_test_linear_arr).detach().cpu().numpy()
+
+                table = wandb.Table(data = [[x] for x in intermediate],columns = ['MSE Loss [dB]'])
+                wandb.log({'Linear Test Loss Distribution': wandb.plot.histogram(table,'MSE Loss [dB]', title =
+                                                                          'Test Loss Histogram')})
+
         except:
             self.ForceClose()
             raise
@@ -288,12 +307,17 @@ class Pipeline(TensorBoard_BaseLogger):
 
                 self.MSE_test_linear_arr = torch.mean(test_loss,dim=[n for n in range(1,test_loss.ndim)])
 
+                self.PlotResults(test_input,test_target,Inference_out)
+
 
             self.MSE_test_linear_avg = self.MSE_test_linear_arr.mean()
             self.MSE_test_dB_avg = 10*torch.log10(self.MSE_test_linear_avg)
 
-            self.writer.add_scalar('Test Loss [dB]', self.MSE_test_dB_avg.item())
+            if not self.debug:
+                wandb.log({'Test Loss [dB]': self.MSE_test_dB_avg.item()})
 
 
+            print(f'Test Loss: {self.MSE_test_dB_avg} [dB]')
 
-
+    def PlotResults(self,test_input,test_target,predictions):
+        pass

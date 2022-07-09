@@ -99,6 +99,7 @@ class Encoder(torch.nn.Module):
         self.ReLU = nn.ModuleList([nn.ReLU() for _ in self.conv_filters])
         self.Flatten = nn.Flatten()
 
+
         # Create modules for conv layers and padding layers
         self.ConvLayers = nn.ModuleList()
         self.PaddingLayers = nn.ModuleList()
@@ -138,6 +139,8 @@ class Encoder(torch.nn.Module):
 
     # Define Forward pass of the encoder
     def forward(self,x):
+
+        x = nn.functional.normalize(x,dim = 2)
 
         for Conv,Pad,BNorm, Relu in zip(self.ConvLayers,self.PaddingLayers,self.BatchNormLayers,self.ReLU):
 

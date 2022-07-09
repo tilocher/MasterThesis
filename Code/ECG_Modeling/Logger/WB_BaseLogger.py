@@ -1,3 +1,5 @@
+import datetime
+
 import torch
 import wandb
 import os
@@ -9,12 +11,14 @@ class WB_Logger():
     Class to Create File structure and save Runs of pytorch models.
     """
 
-    def __init__(self,ParentDirectory: str, Logs: dict = {}) -> None:
+    def __init__(self,ParentDirectory: str, Logs: dict = {}, debug:bool = False) -> None:
         """
         Initialize Class member
         :param ParentDirectory: Name of the parent directory
         :param kwargs: additional structures to be saved, along with their file-extension
         """
+
+        self.debug = debug
 
         # Parent directory file name
         self.ParentDirectory = ParentDirectory
@@ -24,7 +28,7 @@ class WB_Logger():
 
         # Create the main Folder for all runs of all instances
         if not 'runs' in os.listdir(self.Base_folder):
-            os.makedirs(self.Base_folder+ '\\runs')
+            os.makedirs(self.Base_folder + '\\WandB_runs')
 
         # Additional  structures to be saved
         self.Logs = Logs
@@ -35,39 +39,31 @@ class WB_Logger():
         # Manage all the file structure and create folders, if they are missing
         self.ManageFiles()
 
-        # Init TensorBoard writer
-        wandb.login()
-        wandb.init(project='MasterThesis',
-                   name= self.RunFileName,
-                   config={'lr':0.1})
+        self.EntetyName = 'tilocher-team'
+        self.ProjectName = 'MasterThesis'
 
-        # # Launch a local TensorBoard server
-        # self.LaunchTensorBoard()
+        if not debug:
+            # Init WandB
+            self.api = wandb.Api()
+            # wandb.login()
+            # wandb.init(project=self.ProjectName,
+            #            name=self.RunFileName,
+            #            group=self.ParentDirectory)
 
-        # Register a function at interpreter exit, to delay the shutdown of the TensorBoard server
-        atexit.register(self.EndOfScript)
+
 
 
     def ManageFiles(self) -> None:
 
         # The full Folder name of the parent directory
-        self.RunFolderName = self.Base_folder + '\\runs\\' + self.ParentDirectory
+        self.RunFolderName = self.Base_folder + '\\WandB_runs\\' + self.ParentDirectory
 
         # Calculate the next number for the filing system
-        if not self.ParentDirectory in os.listdir(self.Base_folder + '\\runs'):
+        if not self.ParentDirectory in os.listdir(self.Base_folder + '\\WandB_runs'):
             os.makedirs(self.RunFolderName)
-            self.run_number = 0
-        else:
-            all_runs = list(filter(lambda x: 'run_' in x,os.listdir(self.RunFolderName)))
-
-            if len(all_runs) > 0:
-                all_runs_sorted = sorted(all_runs, key=lambda x: int(x[4:]))
-                self.run_number = int(all_runs_sorted[-1][4:]) + 1
-            else:
-                self.run_number = 0
 
         # Filename with numbering system
-        self.RunFileName = 'run_{}'.format(self.run_number)
+        self.RunFileName =  datetime.datetime.today().strftime('%d_%m___%H_%M')
 
         # Create an additional folder for all other tracked objects if any
         if not ('Logs' in os.listdir(self.RunFolderName)) and any(self.Logs) :
@@ -82,7 +78,7 @@ class WB_Logger():
 
             FullFolderName = self.RunFolderName +'\\Logs\\'+ FolderName
 
-            FileName = f'{FolderName}_run_{self.run_number}' + FileExtension
+            FileName = f'{FolderName}_{self.RunFileName}' + FileExtension
 
             self.LogFolderNames.update({FolderName:FullFolderName})
             self.LogFileNames.update({FolderName: FileName})
@@ -96,29 +92,16 @@ class WB_Logger():
 
 
 
-
-
-    def LaunchTensorBoard(self) -> None:
-        """
-        Launch a local TensorBoard Server
-        :return:
-        """
-        tb = program.TensorBoard()
-        tb.configure(argv=[None, '--logdir', self.RunFolderName])
-        url = tb.launch()
-        print(f'Tensorboard listening on {url}')
-
     def ForceClose(self) -> None:
         """
         Function to delete all files that have been created if an error occures.
         Added to prevent cluttering of files.
         :return:
         """
-        # Shutdown TensorBoard on error
-        atexit.unregister(self.EndOfScript)
-
-        # Close the writer
-        self.writer.close()
+        # if not self.debug:
+        #     # Close the writer
+        #     run = self.api.run(rf'{wandb.run.entity}/{wandb.run.project}/{wandb.run.id}')
+        #     run.delete()
 
         # Delete all created files
         if self.RunFileName in os.listdir(self.RunFolderName): shutil.rmtree(self.RunFolderName + self.RunFileName)

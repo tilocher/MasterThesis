@@ -1,0 +1,10 @@
+ModelParam:
+  num_channels: 2
+  signal_length: 512
+  conv_filters: (40, 20, 20, 20, 20, 40)
+  conv_kernels: ((40,2), (40,2), (40,2), (40,2), (40,2), (40,2))
+  conv_strides: ((2,1), (2,1), (2,1), (2,1), (2,1), (2,1))
+  conv_dilation: ((1,1),(1,1),(1,1),(1,1),(1,1),(1,1))
+  latent_dim: 25
+
+TrainParam:

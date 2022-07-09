@@ -7,6 +7,7 @@ import time
 
 import matplotlib.pyplot as plt
 import torch
+import wandb
 from tqdm import trange
 
 from Code.ECG_Modeling.SystemModels.ECG_model import ECG_signal, GetNextState, pi
@@ -14,10 +15,13 @@ import numpy as np
 from Code.ECG_Modeling.Filters.Extended_RTS_Smoother import Extended_rts_smoother
 from Code.ECG_Modeling.SystemModels.Extended_sysmdl import SystemModel
 from Code.ECG_Modeling.Filters.EKF import ExtendedKalmanFilter
+from Code.ECG_Modeling.Logger.WB_BaseLogger import WB_Logger
 
-class EM_algorithm():
+class EM_algorithm(WB_Logger):
 
     def __init__(self,ssModel: SystemModel, parameters: list = ('R','mu','Sigma'), **kwargs):
+
+        super(EM_algorithm, self).__init__('EM_Algorithm')
 
         self.ssModel = ssModel
         self.m = ssModel.m
@@ -25,6 +29,8 @@ class EM_algorithm():
 
 
         self.parameters = parameters
+
+        self.UpdateHyperParameters({'OptimizationParams':parameters})
 
         if 'fs' in kwargs.keys(): self.fs = kwargs['fs']
 
@@ -42,7 +48,14 @@ class EM_algorithm():
     def SetRandomPlot(self,value: bool):
         self.random_plot = value
 
+    def UpdateHyperParameters(self, HyperP):
 
+        if hasattr(self, 'HyperParameters'):
+            self.HyperParameters.update(HyperP)
+        else:
+            self.HyperParameters = HyperP
+
+        wandb.config.update(self.HyperParameters)
 
     def FilterEstimatedModel(self, observations: torch.Tensor, states: torch.Tensor, Plot=''):
 
@@ -70,8 +83,8 @@ class EM_algorithm():
 
             filtered_states = RTS.s_x
             error_cov = RTS.s_sigma
-            KGs = RTS.SG_array.reshape(self.ssModel.m , self.ssModel.m , self.T)
-            KGs = RTS.s_smooth_prior
+            # KGs = RTS.SG_array.reshape(self.ssModel.m , self.ssModel.m , self.T)
+            Smoothed_cov = RTS.s_smooth_prior
 
             if states != None:
                 print('Mean RTS loss Estimated Model: {} [dB]'.format(
@@ -112,7 +125,7 @@ class EM_algorithm():
             plt.show()
             plt.clf()
 
-        return filtered_states, error_cov, KGs, MSE_RTS
+        return filtered_states, error_cov, Smoothed_cov, MSE_RTS
 
 
     def EM(self,observation: torch.Tensor, state: torch.Tensor = None, q_2 = 1., r_2 = 1. ,
@@ -121,6 +134,10 @@ class EM_algorithm():
 
         Q = q_2 * torch.eye(self.m) if Q == None else Q
         R = r_2 * torch.eye(self.n)
+
+        wandb.config.update({'q_2_init':q_2,
+                          'r_2_init':r_2,
+                          'NumIts':num_itts})
 
         self.ssModel.UpdateCovariance_Matrix(Q,R)
 
@@ -151,12 +168,12 @@ class EM_algorithm():
                     Plot_ = Plot
                 else:
                     Plot_ = ''
-                filtered_states,error_cov,SGs,loss = self.FilterEstimatedModel(observation,state , Plot= Plot_)
+                filtered_states,error_cov,Smoothed_cov,loss = self.FilterEstimatedModel(observation,state , Plot= Plot_)
 
                 observation = observation.reshape((-1,self.n,1))
                 filtered_states = filtered_states.reshape((-1,self.m,1))
                 error_cov = error_cov.reshape((-1, self.m,self.m))
-                SGs = SGs.reshape((-1, self.m,self.m))
+                Smoothed_cov = Smoothed_cov.reshape((-1, self.m,self.m))
 
 
                 # Smoothed_Covariance = torch.bmm(error_cov[1:], SGs.mT[:-1])
@@ -180,7 +197,7 @@ class EM_algorithm():
 
                 V_xx = (E_xx[:-1,:,:] + error_cov[:-1,:,:])
                 V_x1x1 = (E_xx[1:,:,:] + error_cov[1:,:,:])
-                V_x1x = torch.bmm(filtered_states[1:],filtered_states[:-1].mT) + SGs[:-1]
+                V_x1x = torch.bmm(filtered_states[1:],filtered_states[:-1].mT) + Smoothed_cov[:-1]
 
                 if 'A' in self.parameters or 'Q' in self.parameters:
 
@@ -214,7 +231,10 @@ class EM_algorithm():
                 self.ssModel.InitSequence(next_init_mean, next_init_cov)
 
                 if loss != None:
-                    losses.append(10*torch.log10(loss.mean()).item())
+                    itt_loss = 10*torch.log10(loss.mean()).item()
+                    losses.append(itt_loss)
+                    wandb.log({'Itterationloss':itt_loss})
+
 
 
             if loss != None:

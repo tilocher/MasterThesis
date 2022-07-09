@@ -52,7 +52,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
     '''
 
     def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = True,
-                 gpu = False, plot_sample = True, desired_shape = None):
+                 gpu = False, plot_sample = True, desired_shape = None, roll = 0):
         super(PhyioNetLoader_MIT_NIH, self).__init__()
         torch.manual_seed(42)
         assert isinstance(num_samples,int), 'Number of samples must be an integer'
@@ -67,6 +67,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         self.file_location = os.path.dirname(os.path.realpath(__file__))
 
         self.gpu = gpu
+
+        self.roll = roll
 
 
         header_files = glob.glob(self.file_location + '\\..\\Datasets\\PhysioNet\\MIT-BIH_Arrhythmia_Database\\*.hea')
@@ -86,58 +88,80 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         self.num_channels = self.files[0].n_sig
 
         self.dataset = torch.tensor(np.array([file.p_signal for file in self.files]),dtype= torch.float32).mT
-        self.labels = torch.tensor(np.array([file.sample for file in self.annotation]),dtype= torch.float32)[0,1:]
+
+
+        # self.labels = torch.tensor(np.array([file.sample for file in self.annotation]),dtype= torch.float32)[0,1:]
+
+        self.labels = [file.sample for file in self.annotation]
 
         self.Center()
 
         self.AddGaussianNoise(SNR_dB)
+
         if plot_sample:
             self.PlotSample()
 
         if desired_shape != None:
+            intermediate = self.centerd_data
+            intermediate_noisy = self.noisy_dataset
 
-            self.centerd_data = self.centerd_data.reshape((-1,) + desired_shape)
-            self.noisy_dataset = self.noisy_dataset.reshape((-1,) + desired_shape)
+            while len(desired_shape) + 1 != len(intermediate.shape):
+                intermediate = intermediate.unsqueeze(-1)
+                intermediate_noisy = intermediate_noisy.unsqueeze(-1)
+
+            permutation = [intermediate.shape[1:].index(x) + 1 for x in desired_shape]
+
+            permutation = [0] + permutation
+
+            self.centerd_data = intermediate.permute(permutation)
+            self.noisy_dataset = intermediate_noisy.permute(permutation)
+
 
 
 
     def Center(self):
+        full_data = []
+        for j,label in enumerate(self.labels):
 
-        beat_indices_last = self.labels[self.num_beats-1::self.num_beats]
-        beat_indices_first = self.labels[0::self.num_beats]
-        intermediate = []
+            beat_indices_last = label[self.num_beats-1::self.num_beats]
+            beat_indices_first = label[0::self.num_beats]
+            intermediate = []
 
 
-        last_index = 0
+            last_index = 0
 
-        self.num_pad = []
+            self.num_pad = []
 
-        for i, index in enumerate(beat_indices_last):
+            for i, index in enumerate(beat_indices_last):
 
-            if self.num_beats == 1:
-                middle = int(last_index + int((index - last_index)/1))
-            else:
-                middle = int( last_index + (index - beat_indices_first[i]) / 2)
-
-            lower_index = middle - int(self.num_samples/2)
-            upper_index = middle + int(self.num_samples/2)
-
-            if lower_index >= 0 and upper_index < self.dataset.shape[-1]:
-
-                if self.num_samples > self.fs*self.num_beats:
-                    num_pad = int((self.num_samples-self.fs)/2)
-                    self.num_pad.append([num_pad,num_pad])
-                    data = torch.nn.functional.pad(self.dataset[:,:,int(index)-int(self.fs/2):int(index) + int(self.fs/2)], (num_pad,num_pad),'replicate')
-                    intermediate.append(data)
-
+                if self.num_beats == 1:
+                    middle = int(last_index + int((index - last_index)/1))
                 else:
-                    intermediate.append(self.dataset[:,:,lower_index:upper_index])
+                    middle = int( last_index + (index - beat_indices_first[i]) / 2)
 
-            last_index = index
+                lower_index = middle - int(self.num_samples/2)
+                upper_index = middle + int(self.num_samples/2)
 
-        centered_data  = torch.stack(intermediate,dim=1)
-        centered_data = self.centerd_data = centered_data.reshape((-1,self.num_channels,self.num_samples))
-        return centered_data
+                if lower_index >= 0 and upper_index < self.dataset.shape[-1]:
+
+                    if self.num_samples > self.fs*self.num_beats:
+                        num_pad = int((self.num_samples-self.fs)/2)
+                        self.num_pad.append([num_pad,num_pad])
+                        data = torch.nn.functional.pad(self.dataset[j,:,int(index)-int(self.fs/2):int(index) + int(self.fs/2)], (num_pad,num_pad),'replicate')
+                        intermediate.append(data)
+
+                    else:
+                        intermediate.append(self.dataset[:,:,lower_index:upper_index])
+
+                last_index = index
+
+            centered_data  = torch.stack(intermediate,dim=1)
+            centered_data  = centered_data.reshape((-1,self.num_channels,self.num_samples))
+
+            full_data.append(centered_data)
+
+        full_data = self.centerd_data =  torch.cat(full_data,dim=0)
+        return full_data
 
 
     def __getitem__(self, item: int) -> tuple:
@@ -146,7 +170,15 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         :param item: index of the samples to get
         :return: A tuple of noisy and clean samples
         """
-        return self.noisy_dataset[item], self.centerd_data[item]
+
+        if self.roll == 0:
+
+            return self.noisy_dataset[item], self.centerd_data[item]
+
+        else:
+            shift = int(torch.randint(low=-self.roll, high=self.roll, size=(1,)))
+            return torch.roll(self.noisy_dataset[item],shift,dims=1), torch.roll(self.centerd_data[item],shift,dims=1)
+
 
     def __len__(self) -> int:
         """
@@ -196,8 +228,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         t = np.arange(start=0, stop=sample_signal.shape[0] / (self.fs), step=1 / (self.fs))
 
         # Plotting
-        plt.plot(t, sample_signal[:], 'g', label='Ground Truth')
-        plt.plot(t, noisy_sample[:], 'r', label='Noisy Signal', alpha=0.4)
+        plt.plot(t, sample_signal[:].detach().cpu(), 'g', label='Ground Truth')
+        plt.plot(t, noisy_sample[:].detach().cpu(), 'r', label='Noisy Signal', alpha=0.4)
         plt.xlabel('Time [s]')
         plt.ylabel('Amplitude [mV]')
         plt.title('MIT-BIH Dataset sample with additive GWN: SNR {} [dB]'.format(round(self.SNR_dB, 2)))

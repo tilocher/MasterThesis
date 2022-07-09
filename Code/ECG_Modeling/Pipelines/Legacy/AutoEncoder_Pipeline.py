@@ -4,7 +4,6 @@
 
 from Code.ECG_Modeling.Pipelines.Base_Pipeline import Pipeline
 from Code.ECG_Modeling.NN.AutoEncoder import AutoEncoder
-from torch.utils.tensorboard import SummaryWriter
 
 
 class ECG_AE_Pipeline(Pipeline):
@@ -13,7 +12,13 @@ class ECG_AE_Pipeline(Pipeline):
 
         super(ECG_AE_Pipeline, self).__init__('ECG_AutoEncoder',**kwargs)
 
+    def setModel(self, model):
 
+        hyperparameters = {'LatentSpace': model.latent_space_dim,
+                           'Channels': model.num_channels,
+                           'NumLayers': len(model.conv_filters)}
+
+        self.HyperParameters.update(hyperparameters)
 
     def InitModel(self,**kwargs):
         pass

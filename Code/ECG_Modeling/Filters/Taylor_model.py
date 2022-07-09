@@ -1,14 +1,15 @@
 # _____________________________________________________________
 # author: T. Locher, tilocher@ethz.ch
 # _____________________________________________________________
+import datetime
 import os
 
 import matplotlib.pyplot as plt
 import numpy
-import pykalman
 import scipy.special
 import torch
 import numpy as np
+import wandb
 from tqdm import trange
 
 from Code.ECG_Modeling.SystemModels.Extended_sysmdl import SystemModel
@@ -21,6 +22,9 @@ class Taylor_model():
         assert taylor_order >= 1, 'Taylor order must be at least 1'
         self.taylor_order = taylor_order
         self.deltaT = deltaT
+
+        wandb.config.update({'TaylorOrder':self.taylor_order,
+                             'DeltaT': self.deltaT})
 
         self.basis_functions = torch.from_numpy(np.array([[deltaT**k/scipy.special.factorial(k)] for k in range(1,taylor_order + 1)])).float()
 
@@ -103,7 +107,9 @@ class Taylor_model():
             self.window_sum = torch.sum(self.window_weights)
             self.n_prediction_weight = torch.arange(-int(self.window_size/2)+1,int(self.window_size/2)+2).reshape(-1,1).float()
 
-
+            wandb.config.update({'Window':self.window,
+                                 'WindowSize': self.window_size,
+                                 'WindowParameter': self.window_parameters})
 
 
 
@@ -236,6 +242,11 @@ class Taylor_model():
 
 if __name__ == '__main__':
 
+    wandb.login()
+    wandb.init(project='MasterThesis',
+               name= datetime.datetime.today().strftime('%d_%m___%H_%M'),
+               group= 'TaylorModelEM')
+
     print(os.getcwd())
     from Code.ECG_Modeling.Filters.EM import EM_algorithm
 
@@ -254,12 +265,12 @@ if __name__ == '__main__':
 
 
 
-    taylor_model = Taylor_model(taylor_order= 5,  window= 'rectangular', window_size= 11 ,window_parameters = 5)
+    taylor_model = Taylor_model(taylor_order= 5,  window= 'gaussian', window_size= 11 ,window_parameters = 11)
 
     shift_obs = torch.empty((num_batches,obs.shape[-1]))
 
     for t in range(num_batches):
-        shift_obs[t] = torch.roll(obs[t,0],0)#np.random.randint(0,0))
+        shift_obs[t] = torch.roll(obs[t,0],0)
 
     # taylor_model.fit(obs[:num_batches,0,:])
     taylor_model.fit(shift_obs[:-5])
@@ -278,7 +289,7 @@ if __name__ == '__main__':
     EM = EM_algorithm(ssModel,Plot_title= 'SNR: {} [dB]'.format(snr), units= 'mV', parameters=['R','Q', 'mu','Sigma'])
 
 
-    filtered_states, loss = EM.EM(shift_obs,shift_state,num_itts=50, r_2=1, q_2= 1,Plot='_SNR_{}_Taylor'.format(snr))
+    filtered_states, loss = EM.EM(shift_obs,shift_state,num_itts=100, r_2=1, q_2= 1,Plot='_SNR_{}_Taylor'.format(snr))
 
 
     last_loss = round(loss[-1],2)
@@ -297,6 +308,7 @@ if __name__ == '__main__':
     plt.xlabel('Time-steps')
     plt.title('Zoomed from time-step: {}-{}'.format(lower_window, upper_window))
     plt.legend()
+    wandb.log({'chart':plt})
     plt.savefig('..\\Plots\\Taylor_models\\sample_prior_batches_{}_windowType_{}_window_size_{}_window_param_{}_loss_{}.pdf'
                 .format(num_batches,taylor_model.window,taylor_model.window_size , taylor_model.window_parameters,last_loss))
     plt.show()
