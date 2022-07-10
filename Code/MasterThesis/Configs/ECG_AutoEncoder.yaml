@@ -1,0 +1,6 @@
+LatentSpace: 50
+Epochs: 50
+L2: 1.0e-6
+lr: 1.0e-3
+BatchSize: 32
+

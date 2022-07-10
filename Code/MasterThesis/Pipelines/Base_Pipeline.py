@@ -8,17 +8,17 @@ import torch
 import wandb
 from torch import nn
 from torch.utils.data.dataloader import DataLoader
-from Code.ECG_Modeling.Logger.WB_BaseLogger import WB_Logger
+from MasterThesis.log.BaseLogger import Logger,LocalLogger
 from tqdm import trange
 import numpy as np
 
-class Pipeline(WB_Logger):
+class Pipeline(Logger):
 
-    def __init__(self, modelName, dev = 'gpu', debug = False, **kwargs):
+    def __init__(self, modelName, dev = 'gpu', wandb = False, **kwargs):
 
         Logs = {'Models':'.pt', 'Pipelines':'.pt','ONNX_models':'.onnx'}
 
-        super(Pipeline, self).__init__(modelName,Logs=Logs,debug= debug)
+        super(Pipeline, self).__init__(modelName,debug= not wandb, AlreadyRunning= True)
 
         if torch.cuda.is_available() and dev == 'gpu':
             self.dev = torch.device("cuda:0")
@@ -28,11 +28,15 @@ class Pipeline(WB_Logger):
             self.dev = torch.device("cpu")
             print("using CPU!")
 
+        self.AddLocalLogs(Logs)
+
         self.Base_folder  = os.path.dirname(os.path.realpath(__file__))
         self.modelName = modelName
         self.Time = dt.now()
 
-        if 'hyperP' : self.HyperParameters = kwargs['hyperP']
+        self.wandb = wandb
+
+        if 'hyperP' in kwargs.keys() : self.HyperParameters = kwargs['hyperP']
 
     def UpdateHyperParameters(self, HyperP):
 
@@ -41,8 +45,11 @@ class Pipeline(WB_Logger):
         else:
             self.HyperParameters = HyperP
 
+        if self.wandb:
+            wandb.config.update(self.HyperParameters)
+
     def save(self):
-        torch.save(self, self.getSaveName('Pipelines'))
+        torch.save(self, self.GetLocalSaveName('Pipelines'))
 
     def setssModel(self, ssModel):
         self.ssModel = ssModel
@@ -51,7 +58,8 @@ class Pipeline(WB_Logger):
 
         self.model = model
 
-        if not self.debug: wandb.watch(self.model, log_freq = 10)
+        if self.wandb: wandb.watch(self.model, log_freq = 10)
+
 
 
     def setTrainingParams(self, n_Epochs = 100, n_Batch = 32, learningRate = 1e-3,
@@ -100,8 +108,7 @@ class Pipeline(WB_Logger):
 
         try:
             self._NNTrain(DataSet,epochs,**kwargs)
-            if not self.debug:
-                wandb.config.update(self.HyperParameters)
+
         except:
             self.ForceClose()
             raise
@@ -121,7 +128,7 @@ class Pipeline(WB_Logger):
 
         DataSet_length = len(DataSet)
 
-        self.HyperParameters.update({'Dataset Samples':DataSet_length})
+        self.UpdateHyperParameters({'Dataset Samples':DataSet_length})
 
         N_train = int(self.Train_CV_split_ratio * DataSet_length)
         N_CV = DataSet_length - N_train
@@ -144,7 +151,7 @@ class Pipeline(WB_Logger):
         else:
             N = epochs
 
-        self.HyperParameters.update({'Epochs': N})
+        self.UpdateHyperParameters({'Epochs': N})
 
         sample_input, sample_target = DataSet[np.random.randint(0, len(DataSet))]
 
@@ -184,9 +191,9 @@ class Pipeline(WB_Logger):
                 MSE_cv_dB_opt = self.MSE_cv_dB_epoch[ti]
                 self.MSE_cv_idx_opt = ti
 
-                torch.save(self.model, self.getSaveName('Models'))
+                torch.save(self.model, self.GetLocalSaveName('Models'))
 
-                torch.onnx.export(self.model,cv_input,self.getSaveName('ONNX_models'))
+                torch.onnx.export(self.model,cv_input,self.GetLocalSaveName('ONNX_models'))
 
 
             ###############################
@@ -228,7 +235,7 @@ class Pipeline(WB_Logger):
             Epoch_cv_loss_dB = 10 * np.log10(Epoch_cv_loss_lin)
             Epoch_train_loss_dB = 10 * np.log10(Epoch_train_loss_lin)
 
-            if not self.debug:
+            if self.wandb:
 
                 wandb.log({'Training Loss': Epoch_train_loss_lin,'CV Loss': Epoch_cv_loss_lin,
                            'Training Loss [dB]': Epoch_train_loss_dB,'CV Loss [dB]': Epoch_cv_loss_dB
@@ -243,9 +250,9 @@ class Pipeline(WB_Logger):
                 'Epoch training Loss: {} [dB], Epoch Val. Loss: {} [dB], Best Val. Loss: {} [dB]'.format(train_desc,
                                                                                                          cv_desc,
                                                                                                          cv_best_desc))
-        if not  self.debug:
-            wandb.save(self.getSaveName('ONNX_models'),policy = 'now')
-            wandb.save(self.getSaveName('Models'), policy = 'now')
+        if not  self.wandb:
+            wandb.save(self.GetLocalSaveName('ONNX_models'),policy = 'now')
+            wandb.save(self.GetLocalSaveName('Models'), policy = 'now')
 
         return [self.MSE_cv_linear_epoch, self.MSE_cv_dB_epoch, self.MSE_train_linear_epoch, self.MSE_train_dB_epoch]
 
@@ -260,7 +267,7 @@ class Pipeline(WB_Logger):
         try:
             self._NNTest(DataSet,**kwargs)
 
-            if not self.debug:
+            if self.wandb:
                 wandb.config.update(self.HyperParameters)
 
                 intermediate = 10*torch.log10(self.MSE_test_linear_arr).detach().cpu().numpy()
@@ -293,7 +300,7 @@ class Pipeline(WB_Logger):
             self.loss_fn.reduction = 'none'
 
 
-        Model = torch.load(self.getSaveName('Models'),map_location= self.dev)
+        Model = torch.load(self.GetLocalSaveName('Models'),map_location= self.dev)
 
         Model.eval()
 
@@ -313,7 +320,7 @@ class Pipeline(WB_Logger):
             self.MSE_test_linear_avg = self.MSE_test_linear_arr.mean()
             self.MSE_test_dB_avg = 10*torch.log10(self.MSE_test_linear_avg)
 
-            if not self.debug:
+            if self.wandb:
                 wandb.log({'Test Loss [dB]': self.MSE_test_dB_avg.item()})
 
 

@@ -1,0 +1,26 @@
+method: bayes
+metric:
+  goal: minimize
+  name: Step
+parameters:
+  BatchSize:
+    distribution: int_uniform
+    max: 64
+    min: 16
+  Epochs:
+    distribution: int_uniform
+    max: 80
+    min: 20
+  L2:
+    distribution: uniform
+    max: 2e-06
+    min: 5e-07
+  LatentSpace:
+    distribution: int_uniform
+    max: 100
+    min: 1
+  lr:
+    distribution: uniform
+    max: 0.002
+    min: 0.0005
+program: AutoEncoder_Pipeline.py
