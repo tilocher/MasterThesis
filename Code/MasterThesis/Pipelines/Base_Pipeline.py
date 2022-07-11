@@ -8,7 +8,7 @@ import torch
 import wandb
 from torch import nn
 from torch.utils.data.dataloader import DataLoader
-from MasterThesis.log.BaseLogger import Logger,LocalLogger
+from Code.MasterThesis.log.BaseLogger import Logger,LocalLogger
 from tqdm import trange
 import numpy as np
 
@@ -250,7 +250,7 @@ class Pipeline(Logger):
                 'Epoch training Loss: {} [dB], Epoch Val. Loss: {} [dB], Best Val. Loss: {} [dB]'.format(train_desc,
                                                                                                          cv_desc,
                                                                                                          cv_best_desc))
-        if not  self.wandb:
+        if self.wandb:
             wandb.save(self.GetLocalSaveName('ONNX_models'),policy = 'now')
             wandb.save(self.GetLocalSaveName('Models'), policy = 'now')
 

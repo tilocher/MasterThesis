@@ -129,6 +129,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
 
             last_index = 0
+            num_waveforms = 0
 
             self.num_pad = []
 
@@ -152,11 +153,12 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
                     else:
                         intermediate.append(self.dataset[:,:,lower_index:upper_index])
-
+                    num_waveforms+=1
                 last_index = index
 
             centered_data  = torch.stack(intermediate,dim=1)
-            centered_data  = centered_data.reshape((-1,self.num_channels,self.num_samples))
+            permutation = [centered_data.shape.index(x) for x in (num_waveforms,self.num_channels,self.num_samples)]
+            centered_data  = centered_data.permute(permutation)
 
             full_data.append(centered_data)
 
@@ -219,6 +221,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         # Randomly select sample and channel
         sample = np.random.randint(0, self.centerd_data.shape[0])
         channel = np.random.randint(0, self.centerd_data.shape[1])
+        sample = np.random.randint(0, self.centerd_data.shape[0])
+
 
         # Get the sample
         sample_signal = self.centerd_data[sample, channel,:]
@@ -234,7 +238,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         plt.ylabel('Amplitude [mV]')
         plt.title('MIT-BIH Dataset sample with additive GWN: SNR {} [dB]'.format(round(self.SNR_dB, 2)))
         plt.legend()
-        plt.savefig(self.file_location + '\\..\\Plots\\MIT-BIH-samples\\MIT-BIH_sample_plot_snr_{}dB.pdf'.format(round(self.SNR_dB, 2)))
+        # plt.savefig(self.file_location + '\\..\\Plots\\MIT-BIH-samples\\MIT-BIH_sample_plot_snr_{}dB.pdf'.format(round(self.SNR_dB, 2)))
         plt.show()
 
 
