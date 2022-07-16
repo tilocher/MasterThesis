@@ -38,14 +38,21 @@ class LocalLogger():
 
     def MakeBaseDirectory(self):
         # The full Folder name of the parent directory
-        self.RunFolderName = self.Base_folder + '/runs/' + self.ParentDirectory
+        self.BaseRunFolderName = self.Base_folder + '/runs/' + self.ParentDirectory
 
         # Calculate the next number for the filing system
         if not self.ParentDirectory in os.listdir(self.Base_folder + '/runs'):
-            os.makedirs(self.RunFolderName)
+            os.makedirs(self.BaseRunFolderName)
+
+
 
         # Filename with numbering system
         self.RunFileName = datetime.datetime.today().strftime('%d_%m___%H_%M')
+
+        if not self.RunFileName in os.listdir(self.BaseRunFolderName):
+            os.makedirs(self.BaseRunFolderName + '/' + self.RunFileName)
+
+        self.RunFolderName = self.BaseRunFolderName + '/' + self.RunFileName
 
         # Create an additional folder for all other tracked objects if any
         if not ('Logs' in os.listdir(self.RunFolderName)):
@@ -77,7 +84,7 @@ class LocalLogger():
 
             FullFolderName = self.RunFolderName + '/Logs/' + FolderName
 
-            FileName = f'{FolderName}_{self.RunFileName}' + FileExtension
+            FileName = f'{FolderName}' + FileExtension
 
             self.LogFolderNames.update({FolderName: FullFolderName})
             self.LogFileNames.update({FolderName: FileName})
@@ -94,7 +101,7 @@ class LocalLogger():
         :return: Full file location
         """
         if Log == 'run':
-            ret = self.RunFolderName + self.RunFileName
+            ret = self.RunFolderName
         elif Log == 'Config':
             ret = self.ConfigFolderName + '/' + self.ConfigFileName
         else:
@@ -109,7 +116,7 @@ class LocalLogger():
         """
 
         # Delete all created files
-        if self.RunFileName in os.listdir(self.RunFolderName): shutil.rmtree(self.RunFolderName + self.RunFileName)
+        if self.RunFileName in os.listdir(self.BaseRunFolderName): shutil.rmtree(self.BaseRunFolderName)
 
         for FolderName in self.Logs.keys():
 
