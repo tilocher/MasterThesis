@@ -10,18 +10,19 @@ import torch
 import wandb
 from tqdm import trange
 
-from Code.ECG_Modeling.SystemModels.ECG_model import ECG_signal, GetNextState, pi
+# from Code.ECG_Modeling.SystemModels.ECG_model import ECG_signal, GetNextState, pi
 import numpy as np
-from Code.ECG_Modeling.Filters.Extended_RTS_Smoother import Extended_rts_smoother
-from Code.ECG_Modeling.SystemModels.Extended_sysmdl import SystemModel
-from Code.ECG_Modeling.Filters.EKF import ExtendedKalmanFilter
-from Code.ECG_Modeling.Logger.WB_BaseLogger import WB_Logger
+from Extended_RTS_Smoother import Extended_rts_smoother
+from SystemModels.Extended_sysmdl import SystemModel
+from EKF import ExtendedKalmanFilter
+from log.BaseLogger import WandbLogger,LocalLogger
+from utils import reshape
+import pykalman
 
-class EM_algorithm(WB_Logger):
+class EM_algorithm():
 
     def __init__(self,ssModel: SystemModel, parameters: list = ('R','mu','Sigma'), **kwargs):
 
-        super(EM_algorithm, self).__init__('EM_Algorithm')
 
         self.ssModel = ssModel
         self.m = ssModel.m
@@ -30,7 +31,6 @@ class EM_algorithm(WB_Logger):
 
         self.parameters = parameters
 
-        self.UpdateHyperParameters({'OptimizationParams':parameters})
 
         if 'fs' in kwargs.keys(): self.fs = kwargs['fs']
 
@@ -48,14 +48,7 @@ class EM_algorithm(WB_Logger):
     def SetRandomPlot(self,value: bool):
         self.random_plot = value
 
-    def UpdateHyperParameters(self, HyperP):
 
-        if hasattr(self, 'HyperParameters'):
-            self.HyperParameters.update(HyperP)
-        else:
-            self.HyperParameters = HyperP
-
-        wandb.config.update(self.HyperParameters)
 
     def FilterEstimatedModel(self, observations: torch.Tensor, states: torch.Tensor, Plot=''):
 
@@ -72,8 +65,9 @@ class EM_algorithm(WB_Logger):
         # Run Loop
 
         with torch.no_grad():
+            observations = observations.reshape((self.n,-1))
 
-            KF.GenerateSequence(observations.reshape((self.n,-1)), KF.T_test)
+            KF.GenerateSequence(observations, KF.T_test)
             RTS.GenerateSequence(KF, RTS.T_test)
 
             if states != None:
@@ -99,47 +93,74 @@ class EM_algorithm(WB_Logger):
             else:
                 t = np.linspace(0,self.T, self.T)
 
+            for channel in range(observations.shape[0]):
+                # if states != None:
+                    # plt.plot(t,states[channel].squeeze(), label='Noiseless data', alpha=0.8, color='g')
+                # plt.plot(t,observations[channel].squeeze(), label='noisy data', alpha=0.3, color='r')
 
-            if states != None:
-                plt.plot(t,states.squeeze(), label='Noiseless data', alpha=0.8, color='g')
-            plt.plot(t,observations.squeeze(), label='noisy data', alpha=0.3, color='r')
+                plt.plot(t,self.ssModel.h(filtered_states,t)[channel].squeeze(), label='Estimated State', color='b')
 
-            plt.plot(t,self.ssModel.h(filtered_states,t).squeeze(), label='Estimated State', color='b')
+                if 'plot_title' in self.__dict__:
+                    title_string = 'Filtered Signal Sample, {}'.format(self.plot_title)
+                else:
+                    title_string = 'Filtered Signal Sample'
 
-            if 'plot_title' in self.__dict__:
-                title_string = 'Filtered Signal Sample, {}'.format(self.plot_title)
-            else:
-                title_string = 'Filtered Signal Sample'
+                plt.title(title_string)
 
-            plt.title(title_string)
+                xlabel_string = 'Time steps' if not 'fs' in self.__dict__ else 'Time [s]'
+                ylabel_string = 'Amplitude [{}]'.format(self.units)
 
-            xlabel_string = 'Time steps' if not 'fs' in self.__dict__ else 'Time [s]'
-            ylabel_string = 'Amplitude [{}]'.format(self.units)
+                plt.xlabel(xlabel_string)
+                plt.ylabel(ylabel_string)
+                plt.legend()
+                # if Plot == 'Plot':
+                #     wandb.log({'TestSample': plt})
 
-            plt.xlabel(xlabel_string)
-            plt.ylabel(ylabel_string)
-            plt.legend()
-            if Plot != 'Plot':
-                plt.savefig(os.path.dirname(os.path.realpath(__file__)) +
-                            '\\..\\Plots\\EM_filtered_sample\\EM_filtered_Sample_{}_{}.pdf'.format(str(datetime.datetime.now().date()),Plot))
-            plt.show()
-            plt.clf()
+                #     plt.savefig(os.path.dirname(os.path.realpath(__file__)) +
+                #                 '\\..\\Plots\\EM_filtered_sample\\EM_filtered_Sample_{}_{}.pdf'.format(str(datetime.datetime.now().date()),Plot))
+                plt.show()
+                plt.clf()
 
         return filtered_states, error_cov, Smoothed_cov, MSE_RTS
 
 
     def EM(self,observation: torch.Tensor, state: torch.Tensor = None, q_2 = 1., r_2 = 1. ,
-           Plot = 'Plot', num_itts = 10, Q = None):
+           Plot = 'Plot', num_itts = 10, Q = None, window_size = 20):
 
 
         Q = q_2 * torch.eye(self.m) if Q == None else Q
         R = r_2 * torch.eye(self.n)
 
-        wandb.config.update({'q_2_init':q_2,
-                          'r_2_init':r_2,
-                          'NumIts':num_itts})
+        self.ssModel.UpdateCovariance_Matrix(Q, R)
 
-        self.ssModel.UpdateCovariance_Matrix(Q,R)
+        KF = ExtendedKalmanFilter(self.ssModel)
+        KF.InitSequence(self.ssModel.m1x_0, self.ssModel.m2x_0)
+
+        KF.GenerateSequence(observation, self.ssModel.T)
+
+        # Compare to pykalman
+        kf = pykalman.KalmanFilter(
+            transition_matrices=self.ssModel.getFJacobian(0,0).numpy(), observation_matrices=self.ssModel.getHJacobian(0,0).numpy(),
+            transition_covariance=Q.numpy(), observation_covariance=R.numpy(),
+            transition_offsets=None, observation_offsets=None,
+            initial_state_mean=self.ssModel.m1x_0.squeeze().numpy().T, initial_state_covariance=self.ssModel.m2x_0.numpy(),
+            em_vars=['transition_covariance', 'observation_covariance',
+                     'initial_state_mean', 'initial_state_covariance']
+        )
+        # fs = kf.filter(observation.numpy().T)
+        kf = kf.em(observation.numpy().T,n_iter= 10)
+        print(kf.observation_covariance)
+
+        fs = kf.smooth(observation.numpy().T)
+
+
+
+
+
+        # plt.plot(KF.x[0], label='Mine')
+        plt.plot(fs[0][:,0], label = 'pykalman')
+        # plt.legend()
+        # plt.show()
 
         losses = []
 
@@ -149,7 +170,10 @@ class EM_algorithm(WB_Logger):
 
             self.ssModel.T = self.ssModel.T_test = T
 
-            observation = observation.reshape((self.n,T))
+
+            observation = reshape(observation.squeeze(),(self.n, T))
+
+            # observation = observation.reshape((self.n,T))
 
             if state != None:
                 state = state.reshape((self.n, T))
@@ -159,6 +183,8 @@ class EM_algorithm(WB_Logger):
 
             for i in range(num_itts):
 
+                if i == 8:
+                    print('dfsdf')
                 # Create the system model
                 if 'R' in self.parameters:
                     self.ssModel.UpdateR(R)
@@ -168,12 +194,13 @@ class EM_algorithm(WB_Logger):
                     Plot_ = Plot
                 else:
                     Plot_ = ''
-                filtered_states,error_cov,Smoothed_cov,loss = self.FilterEstimatedModel(observation,state , Plot= Plot_)
+
+                filtered_states,error_cov,pairwise_cov,loss = self.FilterEstimatedModel(observation,state , Plot= Plot_)
 
                 observation = observation.reshape((-1,self.n,1))
-                filtered_states = filtered_states.reshape((-1,self.m,1))
-                error_cov = error_cov.reshape((-1, self.m,self.m))
-                Smoothed_cov = Smoothed_cov.reshape((-1, self.m,self.m))
+                filtered_states = filtered_states.T.unsqueeze(-1)
+                error_cov = error_cov.permute((2,0,1))
+                pairwise_cov = pairwise_cov.permute((2,0,1))
 
 
                 # Smoothed_Covariance = torch.bmm(error_cov[1:], SGs.mT[:-1])
@@ -194,10 +221,18 @@ class EM_algorithm(WB_Logger):
                     C = self.ssModel.HJac(filtered_states,0).repeat(T, 1, 1)
                     R = (U_yy - torch.bmm(C, U_yx.mT) - torch.bmm( U_yx, C.mT) + torch.bmm(torch.bmm(C,U_xx),C.mT)).mean(0)
 
+                err = torch.empty((T-1,self.m,1))
+                for t in range(T-1):
+                    F = self.ssModel.getFJacobian(filtered_states[t],t)
+                    err[t] = (filtered_states[t+1] - torch.mm(F,filtered_states[t]))
+
+                # F = self.ssModel.getFJacobian(0,0)
+                # err = (filtered_states[1:] - torch.mm(F,filtered_states[:-1]))
 
                 V_xx = (E_xx[:-1,:,:] + error_cov[:-1,:,:])
                 V_x1x1 = (E_xx[1:,:,:] + error_cov[1:,:,:])
-                V_x1x = torch.bmm(filtered_states[1:],filtered_states[:-1].mT) + Smoothed_cov[:-1]
+                # V_x1x = torch.bmm(filtered_states[1:],filtered_states[:-1].mT) + pairwise_cov[1:]
+                V_x1x =  pairwise_cov[1:]
 
                 if 'A' in self.parameters or 'Q' in self.parameters:
 
@@ -214,8 +249,13 @@ class EM_algorithm(WB_Logger):
 
                     elif 'Q' in self.parameters and 'A' not in self.parameters:
                         A = self.ssModel.FJac(filtered_states, 0).repeat(T-1, 1, 1)
-                        Q = (V_x1x1 - torch.bmm(A,V_x1x.mT) -  torch.bmm(V_x1x,A.mT) + torch.bmm(torch.bmm(A,V_xx),A.mT))
-                        self.ssModel.SetQ_array(torch.cat((torch.eye(self.m).unsqueeze(0), Q)))
+                        # Q = (V_x1x1 - torch.bmm(A,V_x1x.mT) -  torch.bmm(V_x1x,A.mT) + torch.bmm(torch.bmm(A,V_xx),A.mT))
+                        Vx1A = torch.bmm(V_x1x,A.mT)
+                        Q = torch.bmm(err,err.mT) + torch.bmm(torch.bmm(A,error_cov[:-1]),A.mT) + error_cov[1:] -Vx1A - Vx1A.mT
+                        self.ssModel.UpdateQ(Q.mean(0))
+                        # Inter = Q.unfold(0, window_size, 1).mean(-1)
+                        # Q = torch.cat((Inter, Q[-window_size:]), dim=0)
+                        # self.ssModel.SetQ_array(Q)
 
 
                 if 'Sigma' in self.parameters:
@@ -230,28 +270,22 @@ class EM_algorithm(WB_Logger):
 
                 self.ssModel.InitSequence(next_init_mean, next_init_cov)
 
-                if loss != None:
+                if loss != None :
                     itt_loss = 10*torch.log10(loss.mean()).item()
                     losses.append(itt_loss)
-                    wandb.log({'Itterationloss':itt_loss})
 
 
+                # if wandb_true and Plot == 'Plot':
+                #     wandb.log({'IterationLoss [dB]':itt_loss})
 
-            if loss != None:
 
-                plt.plot(losses,'*g', label = 'loss per iteration')
-                plt.grid()
-                plt.xlabel('Iteration')
-                plt.ylabel('Loss [dB]')
-                plt.title('EM optimization convergence '+ self.plot_title)
-                plt.legend()
-                plt.savefig(os.path.dirname(os.path.realpath(__file__)) + '\\..\\Plots\\EM_convergence\\EM_convergence_plot{}.pdf'.format(Plot))
-                plt.show()
+                print(self.ssModel.Q)
+                print('---------------------------------')
 
-            if loss != None:
-                return filtered_states,losses
-            else:
-                losses = loss
+            # if loss != None:
+            #     return filtered_states,losses
+            # else:
+            #     losses = loss
 
             return filtered_states, losses
 

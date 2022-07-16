@@ -4,14 +4,32 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d12d40bb-4d32-4d02-a40d-1fa34b7862aa" name="Changes" comment="Init Commit">
-      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/AutoEncoder_Pipeline.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/__init__.py" afterDir="false" />
+    <list default="true" id="d12d40bb-4d32-4d02-a40d-1fa34b7862aa" name="Changes" comment="Fixed Dataset Bug">
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/AutoEncoder_Main.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/Configs/EM_sweep.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/Configs/EM_taylor.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/Configs/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/DataLoaders/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/EM_main.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/Filters/KalmanSmoother.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/NNs/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/EM_Pipeline.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/log/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/tmp.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Code/MasterThesis/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/MasterThesis/Configs/ECG_AutoEncoder.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/Configs/ECG_AutoEncoder.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Code/MasterThesis/DataLoaders/PhysioNetLoader.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/DataLoaders/PhysioNetLoader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/MasterThesis/Filters/EKF.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/Filters/EKF.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/MasterThesis/Filters/EM.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/Filters/EM.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/MasterThesis/Filters/Extended_RTS_Smoother.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/Filters/Extended_RTS_Smoother.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/AutoEncoder_Pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/AutoEncoder_Pipeline.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/Base_Pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/Base_Pipeline.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/wandb/sweep.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/Pipelines/wandb/sweep.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/MasterThesis/SystemModels/Taylor_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/SystemModels/Taylor_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Code/MasterThesis/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Code/MasterThesis/log/BaseLogger.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/log/BaseLogger.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/Code/MasterThesis/SystemModels/__init__.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -84,12 +102,13 @@
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Timur\Desktop\MasterThesis\Code\MasterThesis" />
       <recent name="C:\Users\Timur\Desktop\MasterThesis\Code\ECG_Modeling\Pipelines\Legacy" />
       <recent name="C:\Users\Timur\Desktop\MasterThesis\Code\ECG_Modeling" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.AutoEncoder_Pipeline">
-    <configuration name="AutoEncoder" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+  <component name="RunManager" selected="Python.tmp">
+    <configuration name="AutoEncoder_Main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="MasterThesis" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -97,12 +116,12 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/MasterThesis/NNs" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/MasterThesis" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/MasterThesis/NNs/AutoEncoder.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/MasterThesis/AutoEncoder_Main.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -121,10 +140,54 @@
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/MasterThesis/Pipelines" />
       <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="false" />
+      <option name="ADD_SOURCE_ROOTS" value="false" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/MasterThesis/Pipelines/AutoEncoder_Pipeline.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="EM_main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/MasterThesis" />
+      <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/MasterThesis/Pipelines/AutoEncoder_Pipeline.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/MasterThesis/EM_main.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="KalmanSmoother" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/MasterThesis/Filters" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/MasterThesis/Filters/KalmanSmoother.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -155,15 +218,43 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="tmp" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MasterThesis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Code/MasterThesis" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="false" />
+      <option name="ADD_SOURCE_ROOTS" value="false" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Code/MasterThesis/tmp.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <list>
       <item itemvalue="Python.main_FH_learn" />
-      <item itemvalue="Python.AutoEncoder" />
       <item itemvalue="Python.AutoEncoder_Pipeline" />
+      <item itemvalue="Python.AutoEncoder_Main" />
+      <item itemvalue="Python.EM_main" />
+      <item itemvalue="Python.KalmanSmoother" />
+      <item itemvalue="Python.tmp" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.tmp" />
+        <item itemvalue="Python.KalmanSmoother" />
+        <item itemvalue="Python.EM_main" />
+        <item itemvalue="Python.AutoEncoder_Main" />
         <item itemvalue="Python.AutoEncoder_Pipeline" />
-        <item itemvalue="Python.AutoEncoder" />
       </list>
     </recent_temporary>
   </component>
@@ -241,7 +332,14 @@
       <workItem from="1657351491491" duration="13540000" />
       <workItem from="1657379511992" duration="1766000" />
       <workItem from="1657437663846" duration="4992000" />
-      <workItem from="1657524735890" duration="5547000" />
+      <workItem from="1657524735890" duration="9532000" />
+      <workItem from="1657535477566" duration="15368000" />
+      <workItem from="1657607872265" duration="8527000" />
+      <workItem from="1657661731907" duration="1898000" />
+      <workItem from="1657700640999" duration="23691000" />
+      <workItem from="1657803601519" duration="22264000" />
+      <workItem from="1657840163327" duration="381000" />
+      <workItem from="1657873387284" duration="909000" />
     </task>
     <task id="LOCAL-00001" summary="Added ECG model for evolution learning and LS Taylor model">
       <created>1655397551914</created>
@@ -341,7 +439,14 @@
       <option name="project" value="LOCAL" />
       <updated>1657368485030</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="Fixed Dataset Bug">
+      <created>1657531472621</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1657531472621</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -384,7 +489,8 @@
     <MESSAGE value="Integrated TensorBoard" />
     <MESSAGE value="Integrated WandB" />
     <MESSAGE value="Init Commit" />
-    <option name="LAST_COMMIT_MESSAGE" value="Init Commit" />
+    <MESSAGE value="Fixed Dataset Bug" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fixed Dataset Bug" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -545,9 +651,39 @@
           <option name="timeStamp" value="862" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/Code/MasterThesis/Pipelines/AutoEncoder_Pipeline.py</url>
-          <line>96</line>
-          <option name="timeStamp" value="870" />
+          <url>file://$PROJECT_DIR$/Code/MasterThesis/NNs/AutoEncoder.py</url>
+          <line>3</line>
+          <option name="timeStamp" value="880" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/MasterThesis/Pipelines/EM_Pipeline.py</url>
+          <line>74</line>
+          <option name="timeStamp" value="965" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/MasterThesis/Filters/EM.py</url>
+          <line>257</line>
+          <option name="timeStamp" value="1031" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/MasterThesis/Filters/EM.py</url>
+          <line>186</line>
+          <option name="timeStamp" value="1032" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/MasterThesis/Filters/EM.py</url>
+          <line>231</line>
+          <option name="timeStamp" value="1033" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/MasterThesis/Filters/EM.py</url>
+          <line>253</line>
+          <option name="timeStamp" value="1034" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Code/MasterThesis/Filters/EM.py</url>
+          <line>252</line>
+          <option name="timeStamp" value="1035" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
@@ -558,14 +694,11 @@
         </breakpoint>
       </default-breakpoints>
     </breakpoint-manager>
-    <watches-manager>
-      <configuration name="PythonConfigurationType">
-        <watch expression="self" />
-      </configuration>
-    </watches-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Pipeline_two.coverage" NAME="AutoEncoder_Pipeline_two Coverage Results" MODIFIED="1657439324702" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/MasterThesis/Pipelines" />
+    <SUITE FILE_PATH="coverage/MasterThesis$EM_main.coverage" NAME="EM_main Coverage Results" MODIFIED="1657840381443" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/MasterThesis" />
+    <SUITE FILE_PATH="coverage/MasterThesis$KalmanSmoother.coverage" NAME="KalmanSmoother Coverage Results" MODIFIED="1657873930864" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/MasterThesis/Filters" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_KNet_linear.coverage" NAME="main_KNet_linear Coverage Results" MODIFIED="1651935033856" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Unsupervised_EUSIPCO_22" />
     <SUITE FILE_PATH="coverage/MasterThesis$ECG_model__1_.coverage" NAME="ECG_model (1) Coverage Results" MODIFIED="1655793441160" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/SystemModels" />
     <SUITE FILE_PATH="coverage/MasterThesis$Model_testing_main.coverage" NAME="Model_testing_main Coverage Results" MODIFIED="1656662994334" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
@@ -583,9 +716,9 @@
     <SUITE FILE_PATH="coverage/MasterThesis$WB_BaseLogger.coverage" NAME="WB_BaseLogger Coverage Results" MODIFIED="1657229050182" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Logger" />
     <SUITE FILE_PATH="coverage/MasterThesis$main_linear.coverage" NAME="main_linear Coverage Results" MODIFIED="1655274200465" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22" />
     <SUITE FILE_PATH="coverage/MasterThesis$PhysioNetLoader.coverage" NAME="PhysioNetLoader Coverage Results" MODIFIED="1656887916442" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/DataLoaders" />
-    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Pipeline.coverage" NAME="AutoEncoder_Pipeline Coverage Results" MODIFIED="1657530815952" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/MasterThesis/Pipelines" />
+    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Pipeline.coverage" NAME="AutoEncoder_Pipeline Coverage Results" MODIFIED="1657533516767" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/MasterThesis/Pipelines" />
     <SUITE FILE_PATH="coverage/MasterThesis$Taylor_model.coverage" NAME="Taylor_model Coverage Results" MODIFIED="1657354125333" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
-    <SUITE FILE_PATH="coverage/MasterThesis$tmp.coverage" NAME="tmp Coverage Results" MODIFIED="1655374653225" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
+    <SUITE FILE_PATH="coverage/MasterThesis$tmp.coverage" NAME="tmp Coverage Results" MODIFIED="1657874200383" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/MasterThesis" />
     <SUITE FILE_PATH="coverage/MasterThesis$TensorBoard_BaseLogger.coverage" NAME="TensorBoard_BaseLogger Coverage Results" MODIFIED="1657206283982" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Logger" />
     <SUITE FILE_PATH="coverage/MasterThesis$Pipeline_ECGModel.coverage" NAME="Pipeline_ECGModel Coverage Results" MODIFIED="1653990805593" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/Unsupervised_EUSIPCO_22/Pipelines" />
     <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Pipeline__1_.coverage" NAME="AutoEncoder_Pipeline (1) Coverage Results" MODIFIED="1657524773105" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/MasterThesis/Pipelines/wandb" />
@@ -595,6 +728,7 @@
     <SUITE FILE_PATH="coverage/MasterThesis$LS_Taylor.coverage" NAME="LS_Taylor Coverage Results" MODIFIED="1655899170381" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
     <SUITE FILE_PATH="coverage/MasterThesis$Comparison.coverage" NAME="Comparison Coverage Results" MODIFIED="1656413773154" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
     <SUITE FILE_PATH="coverage/MasterThesis$ConstantModels.coverage" NAME="ConstantModels Coverage Results" MODIFIED="1656494092506" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling/Filters" />
+    <SUITE FILE_PATH="coverage/MasterThesis$AutoEncoder_Main.coverage" NAME="AutoEncoder_Main Coverage Results" MODIFIED="1657718485407" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/MasterThesis" />
     <SUITE FILE_PATH="coverage/MasterThesis$Model_testin_main.coverage" NAME="Model_testin_main Coverage Results" MODIFIED="1656503580932" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Code/ECG_Modeling" />
   </component>
 </project>

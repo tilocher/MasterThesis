@@ -8,17 +8,20 @@ import torch
 import wandb
 from torch import nn
 from torch.utils.data.dataloader import DataLoader
-from Code.MasterThesis.log.BaseLogger import Logger,LocalLogger
+from log.BaseLogger import WandbLogger,LocalLogger
 from tqdm import trange
 import numpy as np
 
-class Pipeline(Logger):
+class Pipeline():
 
-    def __init__(self, modelName, dev = 'gpu', wandb = False, **kwargs):
+    def __init__(self, modelName,Logger, dev = 'gpu', **kwargs):
+
+
 
         Logs = {'Models':'.pt', 'Pipelines':'.pt','ONNX_models':'.onnx'}
 
-        super(Pipeline, self).__init__(modelName,debug= not wandb, AlreadyRunning= True)
+        self.Logger = Logger
+
 
         if torch.cuda.is_available() and dev == 'gpu':
             self.dev = torch.device("cuda:0")
@@ -28,28 +31,31 @@ class Pipeline(Logger):
             self.dev = torch.device("cpu")
             print("using CPU!")
 
-        self.AddLocalLogs(Logs)
+        self.Logger.AddLocalLogs(Logs)
 
         self.Base_folder  = os.path.dirname(os.path.realpath(__file__))
         self.modelName = modelName
         self.Time = dt.now()
 
-        self.wandb = wandb
+        self.wandb = isinstance(self.Logger, WandbLogger)
 
-        if 'hyperP' in kwargs.keys() : self.HyperParameters = kwargs['hyperP']
+        if 'hyperP' in kwargs.keys() :
+            self.HyperParameters = kwargs['hyperP']
+            assert isinstance(self.HyperParameters,dict), 'The Hyper-parameters must be given as a dict'
 
-    def UpdateHyperParameters(self, HyperP):
 
-        if hasattr(self,'HyperParameters'):
-            self.HyperParameters.update(HyperP)
-        else:
-            self.HyperParameters = HyperP
-
-        if self.wandb:
-            wandb.config.update(self.HyperParameters)
+    # def UpdateHyperParameters(self, HyperP):
+    #
+    #     if hasattr(self,'HyperParameters'):
+    #         self.HyperParameters.update(HyperP)
+    #     else:
+    #         self.HyperParameters = HyperP
+    #
+    #     if self.wandb:
+    #         wandb.config.update(self.HyperParameters)
 
     def save(self):
-        torch.save(self, self.GetLocalSaveName('Pipelines'))
+        torch.save(self, self.Logger.GetLocalSaveName('Pipelines'))
 
     def setssModel(self, ssModel):
         self.ssModel = ssModel
@@ -89,7 +95,7 @@ class Pipeline(Logger):
                   'L2': self.weightDecay,
                   'Optimizer': 'ADAM'}
 
-        self.UpdateHyperParameters(HyperP)
+        self.Logger.SaveConfig(HyperP)
 
 
 
@@ -110,7 +116,7 @@ class Pipeline(Logger):
             self._NNTrain(DataSet,epochs,**kwargs)
 
         except:
-            self.ForceClose()
+            self.Logger.ForceClose()
             raise
 
         end_time = dt.now()
@@ -128,7 +134,7 @@ class Pipeline(Logger):
 
         DataSet_length = len(DataSet)
 
-        self.UpdateHyperParameters({'Dataset Samples':DataSet_length})
+        self.Logger.SaveConfig({'Dataset Samples':DataSet_length})
 
         N_train = int(self.Train_CV_split_ratio * DataSet_length)
         N_CV = DataSet_length - N_train
@@ -151,11 +157,13 @@ class Pipeline(Logger):
         else:
             N = epochs
 
-        self.UpdateHyperParameters({'Epochs': N})
+        self.Logger.SaveConfig({'Epochs': N})
 
         sample_input, sample_target = DataSet[np.random.randint(0, len(DataSet))]
 
         Epoch_itter = trange(N)
+
+        torch.random.manual_seed(420)
 
         Train_Dataset, CV_Dataset = torch.utils.data.random_split(DataSet, [N_train, N_CV],
                                                                   generator=torch.Generator(device=self.dev))
@@ -191,9 +199,9 @@ class Pipeline(Logger):
                 MSE_cv_dB_opt = self.MSE_cv_dB_epoch[ti]
                 self.MSE_cv_idx_opt = ti
 
-                torch.save(self.model, self.GetLocalSaveName('Models'))
+                torch.save(self.model, self.Logger.GetLocalSaveName('Models'))
 
-                torch.onnx.export(self.model,cv_input,self.GetLocalSaveName('ONNX_models'))
+                torch.onnx.export(self.model,cv_input,self.Logger.GetLocalSaveName('ONNX_models'))
 
 
             ###############################
@@ -250,9 +258,12 @@ class Pipeline(Logger):
                 'Epoch training Loss: {} [dB], Epoch Val. Loss: {} [dB], Best Val. Loss: {} [dB]'.format(train_desc,
                                                                                                          cv_desc,
                                                                                                          cv_best_desc))
-        if self.wandb:
-            wandb.save(self.GetLocalSaveName('ONNX_models'),policy = 'now')
-            wandb.save(self.GetLocalSaveName('Models'), policy = 'now')
+            if ti % 50 == 0 and ti != 0:
+                self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learningRate, weight_decay=self.weightDecay)
+            
+        # if self.wandb:
+        #     wandb.save(self.GetLocalSaveName('ONNX_models'),policy = 'now')
+        #     wandb.save(self.GetLocalSaveName('Models'), policy = 'now')
 
         return [self.MSE_cv_linear_epoch, self.MSE_cv_dB_epoch, self.MSE_train_linear_epoch, self.MSE_train_dB_epoch]
 
@@ -268,7 +279,7 @@ class Pipeline(Logger):
             self._NNTest(DataSet,**kwargs)
 
             if self.wandb:
-                wandb.config.update(self.HyperParameters)
+                self.Logger.SaveConfig(self.HyperParameters)
 
                 intermediate = 10*torch.log10(self.MSE_test_linear_arr).detach().cpu().numpy()
 
@@ -277,7 +288,7 @@ class Pipeline(Logger):
                                                                           'Test Loss Histogram')})
 
         except:
-            self.ForceClose()
+            self.Logger.ForceClose()
             raise
 
         end_time = dt.now()
@@ -300,7 +311,7 @@ class Pipeline(Logger):
             self.loss_fn.reduction = 'none'
 
 
-        Model = torch.load(self.GetLocalSaveName('Models'),map_location= self.dev)
+        Model = torch.load(self.Logger.GetLocalSaveName('Models'),map_location= self.dev)
 
         Model.eval()
 

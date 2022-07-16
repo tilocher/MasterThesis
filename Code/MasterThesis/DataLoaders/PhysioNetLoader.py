@@ -20,13 +20,13 @@ class PhyioNetLoader_AbdominalAndDirect(Dataset):
 
         self.file_location = os.path.dirname(os.path.realpath(__file__))
 
-        edf_files = glob.glob(self.file_location+'\\..\\Datasets\\PhysioNet\\abdominal-and-direct-fetal\\*.edf')
+        edf_files = glob.glob(self.file_location+'/../Datasets/PhysioNet/abdominal-and-direct-fetal/*.edf')
         self.files = [mne.io.read_raw_edf(edf_file) for edf_file in edf_files]
 
         self.dataset = torch.tensor(np.array([file.get_data() for file in self.files]), dtype=torch.float32).mT
         # self.labels = torch.tensor(np.array([file.sample for file in self.annotation]), dtype=torch.float32)[0, 1:]
 
-        # test = mne.io.read_raw_edf(self.file_location+'\\..\\Datasets\\PhysioNet\\abdominal-and-direct-fetal\\ANNOTATORS.edf')
+        # test = mne.io.read_raw_edf(self.file_location+'/../Datasets/PhysioNet/abdominal-and-direct-fetal/ANNOTATORS.edf')
 
     def PlotSample(self, length):
         plt.plot(self.dataset[0, 11000:15000,1:].squeeze(), label='mean')
@@ -51,8 +51,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         and: https://archive.physionet.org/physiobank/database/mitdb/
     '''
 
-    def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = True,
-                 gpu = False, plot_sample = True, desired_shape = None, roll = 0):
+    def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = False,
+                 gpu = True, plot_sample = False, desired_shape = None, roll = 0):
         super(PhyioNetLoader_MIT_NIH, self).__init__()
         torch.manual_seed(42)
         assert isinstance(num_samples,int), 'Number of samples must be an integer'
@@ -70,9 +70,13 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         self.roll = roll
 
+        self.dev = torch.device('cuda:0' if torch.cuda.is_available() and gpu else 'cpu')
 
-        header_files = glob.glob(self.file_location + '\\..\\Datasets\\PhysioNet\\MIT-BIH_Arrhythmia_Database\\*.hea')
-        annotation_files = glob.glob(self.file_location + '\\..\\Datasets\\PhysioNet\\MIT-BIH_Arrhythmia_Database\\*.atr')
+        folderName = self.file_location + '/../Datasets/PhysioNet/MIT-BIH_Arrhythmia_Database/'
+
+
+        header_files = glob.glob(folderName +'*.hea')
+        annotation_files = glob.glob(folderName + '*.atr')
 
         if not random_sample:
             sample_header = header_files[:num_sets]
@@ -94,9 +98,24 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         self.labels = [file.sample for file in self.annotation]
 
-        self.Center()
+        shape = str(desired_shape) if desired_shape != None else ''
 
-        self.AddGaussianNoise(SNR_dB)
+        CenteredDataFileName = f'CenteredData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}.pt'
+        NoisyDataFileName = f'NoisyData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}.pt'
+
+        if CenteredDataFileName in os.listdir(folderName):
+            self.centerd_data = torch.load(folderName + CenteredDataFileName).to(self.dev)
+            center_flag = False
+        else:
+            self.Center()
+            center_flag = True
+
+        if NoisyDataFileName in os.listdir(folderName):
+            self.noisy_dataset = torch.load(folderName + NoisyDataFileName).to(self.dev)
+            noisy_flag = False
+        else:
+            self.AddGaussianNoise(SNR_dB)
+            noisy_flag = True
 
         if plot_sample:
             self.PlotSample()
@@ -116,6 +135,11 @@ class PhyioNetLoader_MIT_NIH(Dataset):
             self.centerd_data = intermediate.permute(permutation)
             self.noisy_dataset = intermediate_noisy.permute(permutation)
 
+        if center_flag:
+            torch.save(self.centerd_data, folderName + CenteredDataFileName)
+
+        if noisy_flag:
+            torch.save(self.noisy_dataset, folderName +  NoisyDataFileName)
 
 
 
@@ -152,7 +176,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
                         intermediate.append(data)
 
                     else:
-                        intermediate.append(self.dataset[:,:,lower_index:upper_index])
+                        intermediate.append(self.dataset[j,:,lower_index:upper_index])
                     num_waveforms+=1
                 last_index = index
 
@@ -207,9 +231,10 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         print('SNR of actual signal', round( ( signal_power_dB - noise_power_num).mean().item(), 3), '[dB]')
 
         noisy_sample = signals + noise
-        if self.gpu == True:
-            noisy_sample = noisy_sample.to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
-            self.centerd_data = self.centerd_data.to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
+
+        noisy_sample = noisy_sample.to(self.dev)
+        self.centerd_data = self.centerd_data.to(self.dev)
+
         self.noisy_dataset = noisy_sample
 
     def PlotSample(self) -> None:
@@ -238,7 +263,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         plt.ylabel('Amplitude [mV]')
         plt.title('MIT-BIH Dataset sample with additive GWN: SNR {} [dB]'.format(round(self.SNR_dB, 2)))
         plt.legend()
-        # plt.savefig(self.file_location + '\\..\\Plots\\MIT-BIH-samples\\MIT-BIH_sample_plot_snr_{}dB.pdf'.format(round(self.SNR_dB, 2)))
+        # plt.savefig(self.file_location + '/../Plots/MIT-BIH-samples/MIT-BIH_sample_plot_snr_{}dB.pdf'.format(round(self.SNR_dB, 2)))
         plt.show()
 
 

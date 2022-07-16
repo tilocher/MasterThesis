@@ -11,22 +11,22 @@ import torch
 import numpy as np
 import wandb
 from tqdm import trange
-
-from Code.ECG_Modeling.SystemModels.Extended_sysmdl import SystemModel
+from scipy.optimize import minimize
+from SystemModels.Extended_sysmdl import SystemModel
 
 
 class Taylor_model():
 
-    def __init__(self, taylor_order = 1, deltaT = 1, **kwargs):
+    def __init__(self, taylor_order = 1, deltaT = 1,channels= 2, **kwargs):
 
         assert taylor_order >= 1, 'Taylor order must be at least 1'
         self.taylor_order = taylor_order
         self.deltaT = deltaT
 
-        wandb.config.update({'TaylorOrder':self.taylor_order,
-                             'DeltaT': self.deltaT})
+        self.channels = channels
 
         self.basis_functions = torch.from_numpy(np.array([[deltaT**k/scipy.special.factorial(k)] for k in range(1,taylor_order + 1)])).float()
+        self.basis_functions = self.basis_functions.reshape(( 1, -1)).repeat(( channels, 1))
 
         # Get window parameters
         if 'window' in kwargs.keys():
@@ -107,9 +107,6 @@ class Taylor_model():
             self.window_sum = torch.sum(self.window_weights)
             self.n_prediction_weight = torch.arange(-int(self.window_size/2)+1,int(self.window_size/2)+2).reshape(-1,1).float()
 
-            wandb.config.update({'Window':self.window,
-                                 'WindowSize': self.window_size,
-                                 'WindowParameter': self.window_parameters})
 
 
 
@@ -126,19 +123,22 @@ class Taylor_model():
     def _FitWithWindow(self,data):
 
 
-        time_steps = self.time_steps =  data.shape[-1]
+        # time_steps = self.time_steps =  data.shape[-1]
 
-        data = data.reshape((-1,time_steps))
+        batch_size, channels, time_steps = data.shape
 
-        batch_size = data.shape[0]
+        self.time_steps = time_steps
+
         # basis_functions = self.n_prediction_weight.reshape(-1,1).float() @ self.basis_functions.T
         # basis_functions = basis_functions.repeat((batch_size,1,1))
-        basis_functions = self.basis_functions.reshape((1,1,-1)).repeat((batch_size,self.window_size,1))
+        # basis_functions = self.basis_functions.reshape((1,1,-1)).repeat((batch_size,self.window_size,1))
+        basis_functions = self.basis_functions.reshape((1, self.channels, -1)).repeat((batch_size, 1, 1))
 
+        # weights = self.window_weights.repeat((batch_size,1,1))
 
-        weights = self.window_weights.repeat((batch_size,1,1))
+        weights = torch.diag(self.window_weights)
 
-        basis_functions_w = basis_functions.mT.bmm(torch.sqrt(weights))
+        # basis_functions_w = basis_functions.mT.bmm(torch.sqrt(weights))
 
 
 
@@ -150,21 +150,37 @@ class Taylor_model():
 
         padded_data = torch.nn.functional.pad(data, (-lower_bound, upper_bound), 'replicate')
 
-
-        for t in range(0, time_steps):
-
-            current_state = padded_data[:,t -lower_bound-half_window :t+half_window - lower_bound + 1]#.reshape((-1,1))
-            observations = padded_data[:,t -lower_bound-half_window+1 :t+half_window - lower_bound + 2]
-
-            target_tensor = (observations - current_state).reshape((batch_size,-1,1))
+        def FuncToMin(params, obs, weights, basis):
 
 
+            estimate = np.matmul(basis,params)
 
-            target_tensor_W = target_tensor.mT.bmm(torch.sqrt(weights))
 
-            c = torch.linalg.lstsq(basis_functions_w.mT,target_tensor_W.mT).solution
+            loss = 0
 
-            coefficients[:,t] = c.mean(0).squeeze()
+            for j in range(len(weights)):
+
+                vector = (obs[...,j] - estimate).unsqueeze(-1)
+                loss += weights[j]   * torch.bmm(vector.mT, vector)
+
+            return loss.mean().item()
+
+        for t in trange(0, time_steps, desc = 'Calculating prior'):
+
+            current_state = padded_data[:,:,t -lower_bound-half_window :t+half_window - lower_bound + 1]#.reshape((-1,1))
+            observations = padded_data[:,:,t -lower_bound-half_window+1 :t+half_window - lower_bound + 2]
+
+            target_tensor = (observations - current_state).reshape((batch_size,channels,-1))
+
+
+            phi = minimize(FuncToMin,torch.zeros(self.taylor_order),args= (target_tensor,weights,basis_functions)).x
+
+
+            # target_tensor_W = target_tensor.mT.bmm(torch.sqrt(weights))
+
+            # c = torch.linalg.lstsq(basis_functions_w.mT,target_tensor_W.mT).solution
+
+            coefficients[:,t] = torch.from_numpy(phi)
 
 
 
@@ -200,12 +216,10 @@ class Taylor_model():
 
         return coefficients
 
-    def predict(self,x,t):
-
-        if self.window == '':
-            return self._predictNoWindow(x,t)
-        else:
-            return self._predictWindow(x,t)
+    def f(self,x,t):
+        #TODO: change back
+        # return (x.squeeze()+ self.basis_functions @ self.coefficients[:, t]).reshape(-1,1)
+        return (x.squeeze()).reshape(-1, 1)
 
     @property
     def gradients(self):
@@ -215,27 +229,22 @@ class Taylor_model():
 
         return torch.bmm(torch.transpose(self.coefficients.unsqueeze(2),0,1).mT, basis_functions)
 
-    def _predictWindow(self,x,t):
-
-        return x + self.basis_functions.T @ self.coefficients[:, t]
-
-    def _predictNoWindow(self, x, t):
-
-        return x + self.basis_functions.T @ self.coefficients[:,t]
 
     def Jacobian(self,x,t):
         # return torch.atleast_2d(self.coefficients[0,t])
 
 
         # return (1 + self.coefficients[:,t] @ self.basis_functions).reshape((1,1))
-        return torch.ones((1,1))
+        return torch.eye(self.channels)
     #
-    def GetSysModel(self):
+    def GetSysModel(self,channels):
 
 
-        self.ssModel = SystemModel(self.predict, 0, lambda x,t: x, 0,self.time_steps, self.time_steps,1,1)
+        self.ssModel = SystemModel(self.f, 0, lambda x,t: x, 0,self.time_steps, self.time_steps,channels,channels)
         self.ssModel.setFJac(self.Jacobian)
-        self.ssModel.setHJac(lambda x,t: torch.ones((1,1)))
+        self.ssModel.setHJac(lambda x,t: torch.eye(self.channels))
+
+
 
         return self.ssModel
 

@@ -61,7 +61,7 @@ class ExtendedKalmanFilter:
         self.m2x_prior = torch.matmul(self.m2x_prior, self.F_T) + self.Q
 
         # Predict the 1-st moment of y
-        self.m1y = torch.atleast_2d(torch.squeeze(self.h(self.m1x_prior,t)))
+        self.m1y = torch.squeeze(self.h(self.m1x_prior,t)).reshape(-1,1)
         # Predict the 2-nd moment of y
         self.m2y = torch.matmul(self.H, self.m2x_prior)
         self.m2y = torch.matmul(self.m2y, self.H_T) + self.R
@@ -69,7 +69,7 @@ class ExtendedKalmanFilter:
     # Compute the Kalman Gain
     def KGain(self):
         self.KG = torch.matmul(self.m2x_prior, self.H_T)
-        self.KG = torch.matmul(self.KG, torch.inverse(self.m2y))
+        self.KG = torch.matmul(self.KG, torch.linalg.pinv(self.m2y))
 
         #Save KalmanGain
         self.KG_array[self.i] = self.KG
@@ -77,7 +77,7 @@ class ExtendedKalmanFilter:
 
     # Innovation
     def Innovation(self, y):
-        self.dy = torch.atleast_2d(y - self.m1y)
+        self.dy = (y.reshape(-1,1) - self.m1y)
 
     # Compute Posterior
     def Correct(self):
@@ -120,9 +120,11 @@ class ExtendedKalmanFilter:
     def GenerateSequence(self, y, T, ll = False):
         # Pre allocate an array for predicted state and variance
         self.x = torch.empty(size=[self.m, T])
+        self.x_prior = torch.empty(size=[self.m, T])
         self.y = torch.empty(size = [self.n, T])
         self.sigma = torch.empty(size=[self.m, self.m, T])
         self.sigma_y = torch.empty(size = [self.n,self.n ,T])
+        self.sigma_prior = torch.empty(size=[self.m,self.m,T])
         # Pre allocate KG array
         self.KG_array = torch.zeros((T,self.m,self.n))
         self.i = 0 # Index for KG_array alocation
@@ -139,7 +141,9 @@ class ExtendedKalmanFilter:
             yt = torch.squeeze(y[:, t])
             xt,sigmat = self.Update(yt,t)
             self.x[:, t] = torch.squeeze(xt)
+            self.x_prior[:,t] = self.m1x_prior.squeeze()
             self.sigma[:, :, t] = torch.squeeze(sigmat)
+            self.sigma_prior[:,:,t] = torch.squeeze(self.m2x_prior)
             self.sigma_y[:,:,t] = torch.squeeze(self.m2y)
             self.y[:,t] = torch.squeeze(self.m1y)
 

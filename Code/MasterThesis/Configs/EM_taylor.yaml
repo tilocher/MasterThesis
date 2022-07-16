@@ -1,0 +1,4 @@
+Window: 'gaussian'
+WindowSize: 5
+WindowParameter: 3
+TaylorOrder: 5

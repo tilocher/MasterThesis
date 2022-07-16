@@ -43,8 +43,8 @@ class Extended_rts_smoother:
         self.UpdateJacobians(self.sysModel.getFJacobian(filter_x,t), self.sysModel.getHJacobian(self.filter_x_prior,t))
         self.SG = torch.matmul(torch.atleast_2d(filter_sigma), self.F_T)
         self.filter_sigma_prior = torch.matmul(self.F, filter_sigma)
-        self.filter_sigma_prior = torch.matmul(self.filter_sigma_prior, self.F_T) + self.Q
-        self.SG = torch.matmul(self.SG, torch.inverse(self.filter_sigma_prior))
+        self.filter_sigma_prior = torch.matmul(self.filter_sigma_prior, self.F_T) + self.Q #Sigma_t+1|t
+        self.SG = torch.matmul(self.SG, torch.linalg.pinv(self.filter_sigma_prior))
 
         self.SG_array[t] = self.SG.squeeze()
 
@@ -93,12 +93,12 @@ class Extended_rts_smoother:
 
         filter_x = KF.x
         filter_sigma = KF.sigma
-
+        filter_sigma_prior = KF.sigma_prior
         # Pre allocate an array for predicted state and variance
         self.s_x = torch.empty(size=[self.m, T])
         self.s_sigma = torch.empty(size=[self.m, self.m, T])
         self.s_sigma_prior = torch.empty(size=[self.m, self.m, T])
-        self.s_smooth_prior = torch.empty(size=[self.m, self.m, T])
+        self.s_smooth_prior = torch.zeros(size=[self.m, self.m, T])
         # Pre allocate SG array
         self.SG_array = torch.zeros((self.T,self.m,self.m))
 
@@ -112,17 +112,16 @@ class Extended_rts_smoother:
             if self.Q_array != None:
                 self.Q = self.Q_array[t]
             filter_xt = filter_x[:, t].reshape((self.m,-1))
-            filter_sigmat = filter_sigma[:, :, t].reshape((self.m,-1))
+            filter_sigmat = filter_sigma[:, :, t].reshape((self.m,-1)) # Sigma_t|t
             s_xt,s_sigmat = self.S_Update(filter_xt, filter_sigmat,t)
             self.s_x[:, t] = torch.squeeze(s_xt)
             self.s_sigma[:, :, t] = torch.squeeze(s_sigmat)
             self.s_sigma_prior[:,:,t] = self.filter_sigma_prior
 
-        self.smoothed_prior = (torch.eye(self.m) - KF.KG_array[-1]@ KF.H) @ KF.F @ filter_sigma[:,:,-1]
+        # self.smoothed_prior = (torch.eye(self.m) - KF.KG_array[-1]@ KF.H) @ KF.F @ filter_sigma[:,:,-2]
 
-        for t in range(T-1,-1,-1):
-            # self.smoothed_prior = self.s_sigma[:,:,t] @ self.SG_array[t,:,:].T + self.SG_array[t,:,:] @ (self.smoothed_prior - KF.F @ self.s_sigma_prior[:,:,t]) @ self.SG_array[t,:,:].T
-            # self.s_smooth_prior[:,:,t] = self.smoothed_prior.squeeze()
-            self.s_smooth_prior[:,:,t-1] = self.s_sigma[:,:,t] @ self.SG_array[t-1,:,:].T
+        for t in range(1,T):
+            # self.smoothed_prior = filter_sigma[:,:,t+1] @ self.SG_array[t,:,:].T + self.SG_array[t+1,:,:] @ (self.smoothed_prior - KF.F @ filter_sigma_prior[:,:,t+1]) @ self.SG_array[t+1,:,:].T
+            # self.s_smooth_prior[:,:,t+1] = self.smoothed_prior.squeeze()
+            self.s_smooth_prior[:,:,t] = self.s_sigma[:,:,t] @ self.SG_array[t-1,:,:].T
 
-        # print('hakuna matata')
