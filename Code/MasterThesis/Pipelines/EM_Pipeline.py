@@ -4,6 +4,7 @@
 from datetime import datetime as dt
 import os
 
+import numpy as np
 import torch
 import tqdm
 import wandb
@@ -11,17 +12,22 @@ from matplotlib import pyplot as plt
 from torch import nn
 from torch.utils.data.dataloader import DataLoader
 from log.BaseLogger import WandbLogger,LocalLogger
-from tqdm import trange
-import numpy as np
 from SystemModels.Taylor_model import Taylor_model
-from Filters.EM import EM_algorithm
+from Filters.KalmanSmoother import KalmanSmoother
+from DataLoaders.PhysioNetLoader import PhyioNetLoader_MIT_NIH
 
 class EM_Taylor_Pipeline():
 
-    def __init__(self,taylor_model,Logger, parameters = ['R','Q', 'mu','Sigma']):
+    def __init__(self,taylor_model: Taylor_model, Logger: LocalLogger, em_parameters = ['R','Q', 'Mu','Sigma']):
 
+        self.Logs = {'EM_Iter_Loss':'.npy',
+                'EM_Sample_Plot': '.pdf',
+                'EM_Convergence':'.pdf'}
 
         self.Logger = Logger
+
+        self.Logger.AddLocalLogs(self.Logs)
+
 
 
         self.TaylorModel  = taylor_model
@@ -37,80 +43,14 @@ class EM_Taylor_Pipeline():
 
         self.wandb = isinstance(Logger, WandbLogger)
 
+        self.em_parameters = em_parameters
 
-
-        self.parameters = parameters
-
-
-
-    def Test(self, TestLoader,itts, q_2, r_2):
-
-        DataSet_length = len(TestLoader)
-
-        init_values = { 'TestSamples':DataSet_length,
-                        'Parameters': self.parameters,
-                        'OptimizationIts': itts,
-                        'q_2': q_2,
-                       'r_2': r_2}
-
-        self.Logger.SaveConfig(init_values)
-
-        CV_Dataloader = DataLoader(TestLoader, shuffle=False, batch_size=1)
-
-        total_loss = []
-
-        train_input, train_target = next(iter(CV_Dataloader))
-
-        # train_input_0 = train_input.squeeze()[:, 0]
-        # train_input_1 = train_input.squeeze()[:, 1]
-        #
-        # train_target_0 = train_target.squeeze()[:, 0]
-        # train_target_1 = train_target.squeeze()[:, 1]
-
-        states_0, losses_0 = self.EM.EM(train_input.squeeze().T, train_target.squeeze().T, num_itts=itts, r_2=r_2, q_2=q_2, Plot='Plot')
-        # states_1, losses_1 = self.EM.EM(train_input_1, train_target_1, num_itts=itts, r_2=r_2, q_2=q_2,
-        #                                 wandb_true=self.wandb, Plot='Plot')
-
-        # if losses != None and j == DataSet_length -1 :
-        plt.plot(losses_0, '*g', label='loss per iteration')
-        plt.grid()
-        plt.xlabel('Iteration')
-        plt.ylabel('Loss [dB]')
-        plt.title('EM optimization convergence ')
-        plt.legend()
-
-        if self.wandb:
-            wandb.log({'IterationLoss': plt})
-
-
-        for j,(train_input, train_target) in enumerate(tqdm.tqdm(CV_Dataloader)):
-            plot = 'Plot' if j >= DataSet_length - 5 else ''
-            train_input_0 = train_input.squeeze()[:,0]
-            train_input_1 = train_input.squeeze()[:, 1]
-
-            train_target_0 = train_target.squeeze()[:, 0]
-            train_target_1 = train_target.squeeze()[:, 1]
-
-            states_0,_,_, losses_0 = self.EM.FilterEstimatedModel(train_input_0,train_target_0, Plot = plot)
-            states_1,_,_, losses_1 = self.EM.FilterEstimatedModel(train_input_1,train_target_1, Plot = plot)
-
-
-            total_loss.append([losses_0, losses_1])
-
-
-
-
-
-        print('Average Test Loss: {}'.format(10*torch.log10(torch.tensor(total_loss).mean()).item()))
-
-        if self.wandb:
-            wandb.log({'Test Loss [dB]':10*torch.log10(torch.tensor(total_loss).mean()).item()})
 
     def TrainTaylor(self,TrainLoader):
 
         DataSet_length = len(TrainLoader)
 
-        self.Logger.SaveConfig({'TrainSamples':DataSet_length})
+        self.Logger.SaveConfig({'TrainSamples': DataSet_length})
 
         TrainDataset = DataLoader(TrainLoader, shuffle=False, batch_size=DataSet_length)
 
@@ -118,11 +58,95 @@ class EM_Taylor_Pipeline():
 
         self.TaylorModel.fit(train_inputs.squeeze().mT)
 
-        ssModel = self.TaylorModel.GetSysModel(train_inputs.shape[-1])
-        ssModel.InitSequence(torch.zeros((2,1)), torch.eye(2))
+        self.ssModel = self.TaylorModel.GetSysModel(train_inputs.shape[-1])
+        self.ssModel.InitSequence(torch.zeros((2,1)), torch.eye(2))
+
+        self.KalmanSmoother = KalmanSmoother(ssModel= self.ssModel, em_vars= self.em_parameters)
+        self.KalmanSmoother.InitSequence()
 
 
-        self.EM = EM_algorithm(ssModel, units= 'mV', parameters=self.parameters)
+    def TestTaylorEM(self, TestLoader, em_its = 10, Num_Plot_Samples = 10):
+
+        self.TestLoader = TestLoader
+
+        DataSet_length = len(TestLoader)
+
+        self.Logger.SaveConfig({'TestSamples': DataSet_length,
+                                'EM_Parameters': self.em_parameters})
+
+
+        TestDataset = DataLoader(TestLoader, shuffle=False, batch_size=DataSet_length)
+
+        Test_Inputs, Test_Targets = next(iter(TestDataset))
+
+        Initial_r_2 = np.random.random()
+
+        Initial_q_2 = np.random.random()
+
+        self.Logger.SaveConfig({'TestSamples': DataSet_length,
+                                'EM_Parameters': self.em_parameters,
+                                'Initial_r_2': Initial_r_2,
+                                'Initial_q_2': Initial_q_2,
+                                'EM_Iterations': em_its})
+
+        self.EM_losses = self.KalmanSmoother.em(num_itts= em_its, Observations= Test_Inputs.squeeze(), T = self.ssModel.T,
+                               q_2= Initial_q_2, r_2= Initial_r_2, states= Test_Targets.squeeze())
+
+        np.save(self.Logger.GetLocalSaveName('EM_Iter_Loss'),self.EM_losses.numpy())
+
+        if self.wandb:
+            wandb.log({'EM Iteration Losses': self.EM_losses})
+
+        self.PlotEMResults(Test_Inputs,Test_Targets, Num_Plot_Samples= Num_Plot_Samples)
+
+    def PlotEMResults(self,Observations, States, Num_Plot_Samples = 10):
+
+
+        plt.plot(self.EM_losses, '*', color = 'g', label = 'EM Iteration Loss')
+        plt.grid()
+        plt.legend()
+        plt.title('EM MSE Convergence')
+        plt.xlabel('Iteration Step')
+        plt.ylabel('MSE Loss [dB]')
+        plt.savefig(self.Logger.GetLocalSaveName('EM_Convergence'))
+        plt.show()
+
+
+        for i in range(Num_Plot_Samples):
+
+            index = np.random.randint(0,Observations.shape[0])
+            channel = np.random.randint(0,Observations.shape[-1])
+
+            plt.plot(Observations.squeeze()[index,:,channel], label = 'Observations', alpha = 0.4, color  = 'r')
+
+            plt.plot(States.squeeze()[index,:,channel], label = 'Ground Truth', color = 'g')
+
+            plt.plot(self.KalmanSmoother.Smoothed_State_Means[index,:,channel,0], label = 'EM Smoothed States', color = 'b')
+
+            plt.legend()
+
+            plt.xlabel('Time Steps')
+
+            plt.ylabel('Amplitude [mV]')
+
+            plt.title('Sample of EM filtered Observations \n'
+                      f'SNR: {self.TestLoader.dataset.SNR_dB} [dB], Em Iterations: {self.Logger.GetConfig()["EM_Iterations"]},'
+                      f'Channel: {channel}')
+
+            plt.savefig(self.Logger.GetLocalSaveName('EM_Sample_Plot',prefix= f'{i}_'))
+
+            if self.wandb:
+                wandb.log({'chart':plt})
+
+            plt.show()
+
+
+
+
+
+
+
+
 
 
 

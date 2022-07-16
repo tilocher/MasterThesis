@@ -51,13 +51,14 @@ class LocalLogger():
         if not ('Logs' in os.listdir(self.RunFolderName)):
             os.makedirs(self.RunFolderName + '/Logs')
 
-    def SaveConfig(self, config):
+    def SaveConfig(self, Config):
 
-        self.Config.update(config)
+        self.Config.update(Config)
 
         with open(self.ConfigFolderName  + '/' + self.ConfigFileName, 'w') as file:
             yaml.dump(self.Config, file)
         return self.Config
+
 
     def AddLocalLogs(self, Logs: dict):
 
@@ -84,10 +85,8 @@ class LocalLogger():
             if not FolderName in os.listdir(self.RunFolderName + '/Logs'):
                 os.makedirs(FullFolderName)
 
-        # Add / to foldername for later ease of use
-        # self.RunFolderName += '/'
 
-    def GetLocalSaveName(self, Log: str) -> str:
+    def GetLocalSaveName(self, Log: str, prefix = '') -> str:
 
         """
         Get file locations of the objects that are tracked.
@@ -99,7 +98,7 @@ class LocalLogger():
         elif Log == 'Config':
             ret = self.ConfigFolderName + '/' + self.ConfigFileName
         else:
-            ret = self.LogFolderNames[Log] + '/' + self.LogFileNames[Log]
+            ret = self.LogFolderNames[Log] + '/' + prefix + self.LogFileNames[Log]
         return ret
 
     def ForceClose(self) -> None:
@@ -171,6 +170,7 @@ class WandbLogger(LocalLogger):
     def SaveConfig(self,Config):
 
         super().SaveConfig(Config)
+
         wandb.config.update(Config)
 
 

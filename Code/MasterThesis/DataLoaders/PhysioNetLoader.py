@@ -54,6 +54,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
     def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = False,
                  gpu = True, plot_sample = False, desired_shape = None, roll = 0):
         super(PhyioNetLoader_MIT_NIH, self).__init__()
+        self.snr_dB = None
+        self.snr = None
         torch.manual_seed(42)
         assert isinstance(num_samples,int), 'Number of samples must be an integer'
         assert isinstance(num_samples, int), 'Number of heartbeats must be an integer'
