@@ -217,9 +217,8 @@ class Taylor_model():
         return coefficients
 
     def f(self,x,t):
-        #TODO: change back
-        # return (x.squeeze()+ self.basis_functions @ self.coefficients[:, t]).reshape(-1,1)
-        return (x.squeeze()).reshape(-1, 1)
+        return (x.squeeze() + self.basis_functions @ self.coefficients[:, t]).reshape(-1,1)
+        # return (x.squeeze()).reshape(-1, 1)
 
     @property
     def gradients(self):

@@ -27,7 +27,7 @@ if __name__ == '__main__':
     loader = PhyioNetLoader_MIT_NIH(1, 1, signal_length, SNR_dB=snr, random_sample=False, gpu=False,
                                     plot_sample=False, desired_shape=(1, signal_length, 2), roll=0)
 
-    N_train = 100 # int(0.05 * len(loader))
+    N_train = 1000 # int(0.05 * len(loader))
     N_test = len(loader) - N_train
 
     dev = torch.device('cpu')

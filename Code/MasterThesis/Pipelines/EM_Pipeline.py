@@ -22,7 +22,8 @@ class EM_Taylor_Pipeline():
 
         self.Logs = {'EM_Iter_Loss':'.npy',
                 'EM_Sample_Plot': '.pdf',
-                'EM_Convergence':'.pdf'}
+                'EM_Convergence':'.pdf',
+                'KGain':'.npy'}
 
         self.Logger = Logger
 
@@ -45,8 +46,16 @@ class EM_Taylor_Pipeline():
 
         self.em_parameters = em_parameters
 
-
     def TrainTaylor(self,TrainLoader):
+
+        try:
+            self._TrainTaylor(TrainLoader)
+
+        except:
+            self.Logger.ForceClose()
+            raise
+
+    def _TrainTaylor(self,TrainLoader):
 
         DataSet_length = len(TrainLoader)
 
@@ -59,13 +68,27 @@ class EM_Taylor_Pipeline():
         self.TaylorModel.fit(train_inputs.squeeze().mT)
 
         self.ssModel = self.TaylorModel.GetSysModel(train_inputs.shape[-1])
+        # self.ssModel.f = lambda x,t: x
         self.ssModel.InitSequence(torch.zeros((2,1)), torch.eye(2))
+        self.ssModel.GenerateSequence(self.ssModel.Q, self.ssModel.R, self.ssModel.T)
+
+        plt.plot(self.ssModel.x.T, label = 'Learned Prior')
+        plt.show()
+
 
         self.KalmanSmoother = KalmanSmoother(ssModel= self.ssModel, em_vars= self.em_parameters)
         self.KalmanSmoother.InitSequence()
 
-
     def TestTaylorEM(self, TestLoader, em_its = 10, Num_Plot_Samples = 10):
+
+        try:
+            self._TestTaylorEM(TestLoader,em_its,Num_Plot_Samples)
+
+        except:
+            self.Logger.ForceClose()
+            raise
+
+    def _TestTaylorEM(self, TestLoader, em_its = 10, Num_Plot_Samples = 10):
 
         self.TestLoader = TestLoader
 
@@ -93,6 +116,7 @@ class EM_Taylor_Pipeline():
                                q_2= Initial_q_2, r_2= Initial_r_2, states= Test_Targets.squeeze())
 
         np.save(self.Logger.GetLocalSaveName('EM_Iter_Loss'),self.EM_losses.numpy())
+        np.save(self.Logger.GetLocalSaveName('KGain'), self.KalmanSmoother.Kalman_Gains.numpy())
 
         if self.wandb:
             wandb.log({'EM Iteration Losses': self.EM_losses})

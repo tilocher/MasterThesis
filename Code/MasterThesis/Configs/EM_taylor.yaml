@@ -3,10 +3,11 @@ snr: 6 # in [dB]
 signal_length: 360 # Timesteps in an ecg signal
 gpu: False # Whether we want to try to use a gpu or not
 wandb: False
-EM_Its: 20
+EM_Its: 50
+#Note: 'Only identity as prior'
 
 # Taylor Model parameters
 Window: 'gaussian'
-WindowSize: 5
-WindowParameter: 3
+WindowSize: 10
+WindowParameter: 1
 TaylorOrder: 5

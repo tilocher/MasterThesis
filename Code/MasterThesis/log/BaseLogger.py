@@ -114,14 +114,10 @@ class LocalLogger():
         Added to prevent cluttering of files.
         :return:
         """
-
+        # pass
         # Delete all created files
-        if self.RunFileName in os.listdir(self.BaseRunFolderName): shutil.rmtree(self.BaseRunFolderName)
+        if self.RunFileName in os.listdir(self.BaseRunFolderName): shutil.rmtree(self.RunFolderName)
 
-        for FolderName in self.Logs.keys():
-
-            if self.LogFileNames[FolderName] in os.listdir(self.LogFolderNames[FolderName]):
-                os.remove(self.LogFolderNames[FolderName] + '/' + self.LogFileNames[FolderName])
 
     def GetConfig(self):
 
@@ -180,6 +176,3 @@ class WandbLogger(LocalLogger):
 
         wandb.config.update(Config)
 
-
-if __name__ == '__main__':
-    a = Logger('first_test', debug=True)
