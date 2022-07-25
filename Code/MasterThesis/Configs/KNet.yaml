@@ -1,9 +1,16 @@
 # General Parameters
-snr: -6 # in [dB]
+snr: 20 # in [dB]
 signal_length: 360 # Timesteps in an ecg signal
 gpu: True # Whether we want to try to use a gpu or not
 wandb: False
+EM_Its: 1
 roll: 0
+
+# Taylor Model parameters
+Window: 'rectangular'
+WindowSize: 7
+WindowParameter: 0.7
+TaylorOrder: 5
 
 # NN Parameters
 LatentSpace: 50

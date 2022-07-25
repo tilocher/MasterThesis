@@ -4,10 +4,6 @@ signal_length: 360 # Timesteps in an ecg signal
 gpu: False # Whether we want to try to use a gpu or not
 wandb: False
 EM_Its: 50
-#Note: 'Only prior'
+Note: 'Only prior'
 
-# Taylor Model parameters
-Window: 'rectangular'
-WindowSize: 7
-WindowParameter: 0.7
-TaylorOrder: 5
+Order: 4

@@ -93,7 +93,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         self.fs = self.files[0].fs
         self.num_channels = self.files[0].n_sig
 
-        self.dataset = torch.tensor(np.array([file.p_signal for file in self.files]),dtype= torch.float32).mT
+        self.dataset = torch.tensor(np.array([file.p_signal for file in self.files]),dtype= torch.float32,device=
+                                    torch.device('cpu')).mT
 
 
         # self.labels = torch.tensor(np.array([file.sample for file in self.annotation]),dtype= torch.float32)[0,1:]
@@ -102,8 +103,8 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         shape = str(desired_shape) if desired_shape != None else ''
 
-        CenteredDataFileName = f'CenteredData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}.pt'
-        NoisyDataFileName = f'NoisyData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}.pt'
+        CenteredDataFileName = f'CenteredData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}_sets_{num_sets}.pt'
+        NoisyDataFileName = f'NoisyData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}_sets_{num_sets}.pt'
 
         if CenteredDataFileName in os.listdir(folderName):
             self.centerd_data = torch.load(folderName + CenteredDataFileName).to(self.dev)

@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 from scipy.special import factorial
-from Code.ECG_Modeling.SystemModels.Extended_sysmdl import SystemModel
-from Code.ECG_Modeling.SystemModels.ECG_statespace import ECG_StateSpace
+from SystemModels.Extended_sysmdl import SystemModel
 
 
 class ConstantModel():
@@ -55,17 +54,25 @@ class ConstantModel():
         self.R = r_2 * torch.eye(self.observation_order)
 
         def f(x,t):
-            return self.F @ x
+            return (self.F @ x).squeeze()
         def h(x,t):
-            return self.H @ x
+
+            if len(x.shape) != 2:
+                return (self.H @ x).squeeze()
+            else:
+                H = self.H.unsqueeze(0).repeat(self.T,1,1)
+                return (torch.bmm(H,x.unsqueeze(-1))).squeeze(-1)
 
         self.ssModel = SystemModel(f,np.sqrt(q_2),h, np.sqrt(r_2), T,T,state_order,self.observation_order)
         self.ssModel.setFJac(lambda x,t: self.F)
         self.ssModel.setHJac(lambda x,y: self.H)
         self.ssModel.UpdateCovariance_Matrix(self.Q,self.R)
 
-    def GetSSModel(self):
+    def GetSysModel(self,T):
         return self.ssModel
+
+    def fit(self,x):
+        pass
 
     def UpdateGain(self,q_2,r_2):
 
@@ -75,100 +82,4 @@ class ConstantModel():
         self.R = r_2 * torch.eye(self.observation_order)
         self.ssModel.UpdateCovariance_Matrix(self.Q , self.R)
 
-
-
-if __name__ == '__main__':
-
-
-
-    from Code.ECG_Modeling.Filters.EM import EM_algorithm
-
-    from Code.ECG_Modeling.DataLoaders.PhysioNetLoader import PhyioNetLoader_MIT_NIH
-
-    # Data Parameters
-
-    m = 3
-    n = 1
-    q = 0.002
-
-    snr = 10
-    num_itts = 15
-
-    save_plot = False
-    save_loss = False
-
-    # init loss
-    losses = torch.empty((4,num_itts))
-
-    loader = PhyioNetLoader_MIT_NIH(1, 2, SNR_dB=snr, random_sample=False)
-    obs, state = loader.GetData(num_batches= 2)
-
-    print('-----Constant Acceleration Model-----')
-
-    # constant Models
-    Cmodel = ConstantModel(m, 0, q, 1, obs.shape[-1], deltaT = 1)#1/loader.fs)# 7e-3)#1/1000)
-    Cmodel.UpdateGain(q / Cmodel.base_Q[0,0], Cmodel.r_2)
-    ssModel = Cmodel.GetSSModel()
-    ssModel.InitSequence(torch.zeros((m)), torch.eye(m))
-
-    EM = EM_algorithm(ssModel, Plot_title='SNR: {} [dB]'.format(snr), units='mV', parameters=['R'])
-
-    if save_plot:
-        loss = EM.EM(obs, state, num_itts=num_itts, q_2=1000, Q=Cmodel.Q, Plot='_SNR_{}_ConstantA'.format(snr))
-    else:
-        loss = EM.EM(obs, state, num_itts=num_itts, q_2=1000, Q=Cmodel.Q)
-    losses[0] = torch.tensor(loss)
-
-    print('-----Constant Velocity Model-----')
-
-    # constant Models
-    Cmodel = ConstantModel(m-1, 0, q, 1, obs.shape[-1], deltaT = 1/loader.fs)  # 7e-3)#1/1000)
-    Cmodel.UpdateGain(q/ Cmodel.base_Q[0, 0], Cmodel.r_2)
-    ssModel = Cmodel.GetSSModel()
-    ssModel.InitSequence(torch.zeros((m-1)), torch.eye(m-1))
-
-    EM = EM_algorithm(ssModel, Plot_title='SNR: {} [dB]'.format(snr), units='mV', parameters=['R'])
-    if save_plot:
-        loss = EM.EM(obs, state, num_itts=num_itts, q_2=1000, Q=Cmodel.Q, Plot='_SNR_{}_ConstantV'.format(snr))
-    else:
-        loss = EM.EM(obs, state, num_itts=num_itts, q_2=1000, Q=Cmodel.Q)
-    losses[1] = torch.tensor(loss)
-
-    print('-----Taylor Model-----')
-    # Taylor Model
-    from Code.ECG_Modeling.Filters.Taylor_model import Taylor_model
-    taylor_model = Taylor_model(1)
-    taylor_model.fit(obs)
-    ssModel = taylor_model.GetSysModel()
-    ssModel.InitSequence(torch.zeros((1)) , torch.eye(1))
-
-    EM = EM_algorithm(ssModel, Plot_title='SNR: {} [dB]'.format(snr), units='mV', parameters=['R'])
-
-    if save_plot:
-        loss = EM.EM(obs, state, num_itts=num_itts, q_2= q, Plot='_SNR_{}_Taylor'.format(snr))
-    else:
-        loss = EM.EM(obs, state, num_itts=num_itts, q_2=q)
-
-    losses[2] = torch.tensor(loss)
-
-    print('-----ECG ODE Model-----')
-    # ECG Model from paper
-    ssModel = ECG_StateSpace(0.001,1,obs.shape[-1])
-    init_vec = torch.zeros(4)
-    init_vec[0] = 1
-    init_vec[-1] = 2 * np.pi
-    init_cov = torch.eye(4)
-    ssModel.InitSequence(init_vec,init_cov)
-    ssModel.UpdateCovariance_Gain(0.07,1)
-
-    EM = EM_algorithm(ssModel, Plot_title='SNR: {} [dB]'.format(snr), units='mV', parameters=['R'])
-
-    if save_plot:
-        loss = EM.EM(obs, state, num_itts=num_itts, q_2= q, Plot='_SNR_{}_ODE'.format(snr))
-    else:
-        loss = EM.EM(obs, state, num_itts=num_itts, q_2=q)
-    losses[3] = torch.tensor(loss)
-
-    if save_loss:
-        np.save('..\\Arrays\\Taylor_ConstantVel_DiffEq_snr_{}.npy'.format(snr),losses.detach().numpy())
 

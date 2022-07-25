@@ -16,14 +16,16 @@ from SystemModels.Taylor_model import Taylor_model
 from Filters.KalmanSmoother import KalmanSmoother
 from DataLoaders.PhysioNetLoader import PhyioNetLoader_MIT_NIH
 
-class EM_Taylor_Pipeline():
+class EM_Taylor_Pipeline(nn.Module):
 
-    def __init__(self,taylor_model: Taylor_model, Logger: LocalLogger, em_parameters = ['R','Q', 'Mu','Sigma']):
-
+    def __init__(self,PriorModel, Logger: LocalLogger, em_parameters = ['R','Q', 'Mu','Sigma']):
+        super(EM_Taylor_Pipeline, self).__init__()
         self.Logs = {'EM_Iter_Loss':'.npy',
                 'EM_Sample_Plot': '.pdf',
                 'EM_Convergence':'.pdf',
-                'KGain':'.npy'}
+                'KGain':'.npy',
+                'Pipelines':'.pt',
+                'Prior_Plot':'.pdf'}
 
         self.Logger = Logger
 
@@ -31,12 +33,12 @@ class EM_Taylor_Pipeline():
 
 
 
-        self.TaylorModel  = taylor_model
+        self.PriorModel  = PriorModel
 
-        self.HyperParams = {'Window':taylor_model.window,
-                            'WindowSize': taylor_model.window_size,
-                            'WindowParameter': taylor_model.window_parameters,
-                            'TaylorOrder': taylor_model.taylor_order
+        self.HyperParams = {'Window':PriorModel.window,
+                            'WindowSize': PriorModel.window_size,
+                            'WindowParameter': PriorModel.window_parameters,
+                            'TaylorOrder': PriorModel.taylor_order
 
         }
 
@@ -46,16 +48,20 @@ class EM_Taylor_Pipeline():
 
         self.em_parameters = em_parameters
 
-    def TrainTaylor(self,TrainLoader):
+    def save(self):
+        torch.save(self, self.Logger.GetLocalSaveName('Pipelines'))
+
+    def TrainPrior(self,TrainLoader):
 
         try:
-            self._TrainTaylor(TrainLoader)
+            self._TrainPrior(TrainLoader)
+            self.PlotPrior()
 
         except:
             self.Logger.ForceClose()
             raise
 
-    def _TrainTaylor(self,TrainLoader):
+    def _TrainPrior(self,TrainLoader):
 
         DataSet_length = len(TrainLoader)
 
@@ -65,32 +71,75 @@ class EM_Taylor_Pipeline():
 
         train_inputs,_ = next(iter(TrainDataset))
 
-        self.TaylorModel.fit(train_inputs.squeeze().mT)
+        self.PriorModel.fit(train_inputs.squeeze().mT)
 
-        self.ssModel = self.TaylorModel.GetSysModel(train_inputs.shape[-1])
+        self.ssModel = self.PriorModel.GetSysModel(train_inputs.shape[-1])
         # self.ssModel.f = lambda x,t: x
-        self.ssModel.InitSequence(torch.zeros((2,1)), torch.eye(2))
-        self.ssModel.GenerateSequence(self.ssModel.Q, self.ssModel.R, self.ssModel.T)
-
-        plt.plot(self.ssModel.x.T, label = 'Learned Prior')
-        plt.show()
-
+        # self.ssModel.f = self.proxy
+        self.ssModel.InitSequence(torch.zeros((self.ssModel.m,1)), torch.eye(self.ssModel.m))
 
         self.KalmanSmoother = KalmanSmoother(ssModel= self.ssModel, em_vars= self.em_parameters)
         self.KalmanSmoother.InitSequence()
 
-    def TestTaylorEM(self, TestLoader, em_its = 10, Num_Plot_Samples = 10):
+        self.PlotPrior()
+
+
+
+    def PlotPrior(self):
+
+        self.ssModel.GenerateSequence(self.ssModel.Q, self.ssModel.R, self.ssModel.T)
+
+
+        sample = self.ssModel.x.T[:,0]
+
+        # plt.plot(self.ssModel.x.T, label = 'Learned Prior')
+        t = np.arange(start=0, stop=sample.shape[0] / (360), step=1 / (360))
+        fig, ax = plt.subplots(dpi=200)
+
+        ax.plot(t,sample, label = 'Learned Prior', color = 'g')
+        # ax.plot(t, noise[:, 0], label='Noisy observation', color='r', alpha=0.4)
+        ax.grid()
+        ax.legend()
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Amplitude [mV]')
+        ax.set_title('Prior learned by windowed Taylor Approximation \n'
+                     'Window size: {}, Window type: {}'.format(self.PriorModel.window_size,self.PriorModel.window))
+
+        axins = ax.inset_axes([0.05, 0.5, 0.4, 0.4])
+        axins.plot(t, sample, color='g')
+        axins.get_xaxis().set_visible(False)
+        axins.get_yaxis().set_visible(False)
+
+        x1, x2, y1, y2 = 0.4, 0.6, torch.min(sample).item(), torch.max(sample).item()
+        axins.set_xlim(x1, x2)
+        axins.set_ylim(y1, y2)
+        axins.set_xticklabels([])
+        axins.set_yticklabels([])
+        axins.grid()
+
+        ax.indicate_inset_zoom(axins, edgecolor="black")
+
+        plt.savefig(self.Logger.GetLocalSaveName('Prior_Plot'))
+        plt.show()
+
+
+    def TestEM(self, TestLoader, em_its = 10, Num_Plot_Samples = 10):
 
         try:
-            self._TestTaylorEM(TestLoader,em_its,Num_Plot_Samples)
+            self._TestEM(TestLoader,em_its,Num_Plot_Samples)
 
         except:
             self.Logger.ForceClose()
             raise
 
-    def _TestTaylorEM(self, TestLoader, em_its = 10, Num_Plot_Samples = 10):
+    def proxy(self,x,t):
+        return x
+
+    def _TestEM(self, TestLoader, em_its = 10, Num_Plot_Samples = 10):
 
         self.TestLoader = TestLoader
+
+
 
         DataSet_length = len(TestLoader)
 
@@ -102,6 +151,7 @@ class EM_Taylor_Pipeline():
 
         Test_Inputs, Test_Targets = next(iter(TestDataset))
 
+
         Initial_r_2 = np.random.random()
 
         Initial_q_2 = np.random.random()
@@ -112,6 +162,15 @@ class EM_Taylor_Pipeline():
                                 'Initial_q_2': Initial_q_2,
                                 'EM_Iterations': em_its})
 
+        self.KalmanSmoother.InitMean(Test_Inputs[:,0,0].unsqueeze(-1))
+
+        # init_state = torch.zeros_like(Test_Inputs)
+        # init_state = init_state[...,:(self.ssModel.m-2)]
+        # init_state = torch.concat((Test_Targets, init_state), -1)
+        # self.KalmanSmoother.InitMean(init_state.unsqueeze(-1))
+
+
+
         self.EM_losses = self.KalmanSmoother.em(num_itts= em_its, Observations= Test_Inputs.squeeze(), T = self.ssModel.T,
                                q_2= Initial_q_2, r_2= Initial_r_2, states= Test_Targets.squeeze())
 
@@ -120,8 +179,12 @@ class EM_Taylor_Pipeline():
 
         if self.wandb:
             wandb.log({'EM Iteration Losses': self.EM_losses})
+            wandb.log({'Final Loss [dB]': self.EM_losses[-1]})
 
         self.PlotEMResults(Test_Inputs,Test_Targets, Num_Plot_Samples= Num_Plot_Samples)
+
+        self.save()
+
 
     def PlotEMResults(self,Observations, States, Num_Plot_Samples = 10):
 
@@ -133,36 +196,68 @@ class EM_Taylor_Pipeline():
         plt.xlabel('Iteration Step')
         plt.ylabel('MSE Loss [dB]')
         plt.savefig(self.Logger.GetLocalSaveName('EM_Convergence'))
-        plt.show()
+        if self.wandb:
+            wandb.log({'chart':plt})
+        else:
+            plt.show()
 
+        t = np.arange(start=0, stop=self.TestLoader.dataset.fs / (360), step=1 / (360))
 
         for i in range(Num_Plot_Samples):
 
-            index = np.random.randint(0,Observations.shape[0])
-            channel = np.random.randint(0,Observations.shape[-1])
+            # index = np.random.randint(0,Observations.shape[0])
+            # channel = np.random.randint(0,Observations.shape[-1])
+            index = i
+            channel = 0
 
-            plt.plot(Observations.squeeze()[index,:,channel], label = 'Observations', alpha = 0.4, color  = 'r')
+            fig, ax = plt.subplots(dpi=200)
 
-            plt.plot(States.squeeze()[index,:,channel], label = 'Ground Truth', color = 'g')
+            observation = Observations.squeeze()[index,:,channel]
+            state = States.squeeze()[index,:,channel]
+            smoothed_states = self.KalmanSmoother.Smoothed_State_Means[index,:,channel,0]
 
-            plt.plot(self.KalmanSmoother.Smoothed_State_Means[index,:,channel,0], label = 'EM Smoothed States', color = 'b')
+            ax.plot(t,observation, label = 'Observations', alpha = 0.4, color  = 'r')
 
-            plt.legend()
+            ax.plot(t,state, label = 'Ground Truth', color = 'g')
 
-            plt.xlabel('Time Steps')
+            # ax.plot(t,smoothed_states, label = 'EM Smoothed States', color = 'b')
+            ax.plot(t,smoothed_states, label = 'Fitted prior', color = 'b')
 
-            plt.ylabel('Amplitude [mV]')
+            ax.legend()
 
-            plt.title('Sample of EM filtered Observations \n'
+            ax.set_xlabel('Time Steps')
+
+            ax.set_ylabel('Amplitude [mV]')
+
+            ax.set_title('Sample of EM filtered Observations \n'
                       f'SNR: {self.TestLoader.dataset.SNR_dB} [dB], Em Iterations: {self.Logger.GetConfig()["EM_Iterations"]},'
                       f'Channel: {channel}')
+
+            axins = ax.inset_axes([0.05, 0.5, 0.4, 0.4])
+
+
+            axins.plot(t,state,color = 'g')
+            axins.plot(t, smoothed_states, color='b')
+            axins.get_xaxis().set_visible(False)
+            axins.get_yaxis().set_visible(False)
+
+            x1, x2, y1, y2 = 0.4, 0.6, torch.min(torch.min(state),torch.min(smoothed_states)).item(), \
+                             torch.max(torch.max(state),torch.max(smoothed_states)).item()
+            axins.set_xlim(x1, x2)
+            axins.set_ylim(y1, y2)
+            axins.set_xticklabels([])
+            axins.set_yticklabels([])
+            axins.grid()
+
+
+            ax.indicate_inset_zoom(axins, edgecolor="black")
 
             plt.savefig(self.Logger.GetLocalSaveName('EM_Sample_Plot',prefix= f'{i}_'))
 
             if self.wandb:
                 wandb.log({'chart':plt})
-
-            plt.show()
+            else:
+                plt.show()
 
 
 

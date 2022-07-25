@@ -1,0 +1,10 @@
+torch>=1.11.0+cu113
+wandb>=0.12.21
+PyYAML>=6.0
+numpy>=1.23.0
+matplotlib>=3.5.2
+pykalman>=0.9.5
+tqdm>=4.64.0
+wfdb>=4.0.0
+mne>=1.0.3
+scipy>=1.8.1

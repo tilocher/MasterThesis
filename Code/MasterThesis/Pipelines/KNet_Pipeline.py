@@ -1,25 +1,11 @@
-# _____________________________________________________________
-# author: T. Locher, tilocher@ethz.ch
-# _____________________________________________________________
-import sys
-import os
-
-
 from Base_Pipeline import Pipeline
-import torch
-import numpy as np
-from matplotlib import pyplot as plt
-import wandb
-from log.BaseLogger import LocalLogger,WandbLogger
 
 
+class KNet_Pipeline(Pipeline):
 
+    def __init__(self,Logger, **kwargs):
 
-class ECG_AE_Pipeline(Pipeline):
-
-    def __init__(self,Logger: LocalLogger, **kwargs):
-
-        super(ECG_AE_Pipeline, self).__init__('ECG_AutoEncoder',Logger,AdditionalLogs= {'SamplePlots':'.pdf'}, **kwargs)
+        super(KNet_Pipeline, self).__init__('ECG_AutoEncoder',Logger, **kwargs)
 
 
 
@@ -27,6 +13,8 @@ class ECG_AE_Pipeline(Pipeline):
         pass
 
     def Run_Inference(self,input,target,**kwargs):
+
+        self.model(input[:, 0, 0].squeeze(), 0)
 
         model_output = self.model(input)
 
@@ -44,12 +32,10 @@ class ECG_AE_Pipeline(Pipeline):
 
         for i in range(num_samples):
 
-            # random_sample_index = np.random.randint(0,test_input.shape[0])
+            random_sample_index = np.random.randint(0,test_input.shape[0])
             # random_sample_index = np.random.randint(0,test_input.shape[0])
 
-            # random_channel =  np.random.randint(0,2)
-            random_sample_index = i
-            random_channel = 0
+            random_channel =  np.random.randint(0,2)
 
             plt.plot(test_input[random_sample_index,:,random_channel].detach().cpu(), label = 'Observations', alpha = 0.4, color = 'r')
             plt.plot(test_target[random_sample_index,:,random_channel].detach().cpu(), label = 'Ground truth',color = 'g')
@@ -58,25 +44,15 @@ class ECG_AE_Pipeline(Pipeline):
             plt.xlabel('Time Steps')
             plt.ylabel('Amplitude [mV]')
             plt.legend()
-            plt.savefig(self.Logger.GetLocalSaveName('SamplePlots',prefix=  f'{i}_'))
-
             if self.wandb:
                 wandb.log({'chart':plt})
-                plt.clf()
-
             else:
                 plt.show()
 
     def setModel(self, model):
 
         self.model = model
-        parameters = {'LatentSpace':model.latent_space_dim,
-                      'NumChannels': model.num_channels}
-
-        self.Logger.SaveConfig(parameters)
-
-
-
-
-
-
+        # parameters = {'LatentSpace':model.latent_space_dim,
+        #               'NumChannels': model.num_channels}
+        #
+        # self.Logger.SaveConfig(parameters)

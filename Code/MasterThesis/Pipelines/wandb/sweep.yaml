@@ -1,8 +1,0 @@
-method: grid
-metric:
-  goal: minimize
-  name: Step
-parameters:
-  LatentSpace:
-    values: [2,4,8,12,16,20,24,28,32,40,48,56,64,96,128]
-program: AutoEncoder_Main.py

@@ -4,6 +4,7 @@
 from datetime import datetime as dt
 import os
 
+import matplotlib.pyplot as plt
 import torch
 import wandb
 from torch import nn
@@ -18,7 +19,9 @@ class Pipeline():
 
 
 
-        Logs = {'Models':'.pt', 'Pipelines':'.pt','ONNX_models':'.onnx'}
+        Logs = {'Models':'.pt', 'Pipelines':'.pt','ONNX_models':'.onnx','CV_Loss':'.pdf'}
+
+        if 'AdditionalLogs' in kwargs.keys(): Logs.update(kwargs['AdditionalLogs'])
 
         self.Logger = Logger
 
@@ -214,7 +217,7 @@ class Pipeline():
             Train_DataLoader = DataLoader(Train_Dataset, batch_size=self.N_B, shuffle=self.shuffle,
                                           generator=torch.Generator(device=self.dev))
 
-
+            torch.random.manual_seed(3453)
             self.InitModel(**kwargs)
 
 
@@ -258,12 +261,25 @@ class Pipeline():
                 'Epoch training Loss: {} [dB], Epoch Val. Loss: {} [dB], Best Val. Loss: {} [dB]'.format(train_desc,
                                                                                                          cv_desc,
                                                                                                          cv_best_desc))
-            if ti % 50 == 0 and ti != 0:
+            if ti % 35 == 0 and ti != 0:
                 self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learningRate, weight_decay=self.weightDecay)
-            
-        # if self.wandb:
-        #     wandb.save(self.GetLocalSaveName('ONNX_models'),policy = 'now')
-        #     wandb.save(self.GetLocalSaveName('Models'), policy = 'now')
+
+        if self.wandb:
+            wandb.save(self.Logger.GetLocalSaveName('ONNX_models'),policy = 'now')
+            wandb.save(self.Logger.GetLocalSaveName('Models'), policy = 'now')
+
+        plt.plot(self.MSE_cv_dB_epoch.detach().cpu().numpy(),'*', label = 'CV Loss', color = 'r' )
+        plt.xlabel('Iteration')
+        plt.ylabel('MSE Loss [dB]')
+        plt.legend()
+        plt.grid()
+        plt.savefig(self.Logger.GetLocalSaveName('CV_Loss'))
+
+        if not self.wandb:
+            plt.show()
+        plt.clf()
+
+        self.save()
 
         return [self.MSE_cv_linear_epoch, self.MSE_cv_dB_epoch, self.MSE_train_linear_epoch, self.MSE_train_dB_epoch]
 
@@ -279,7 +295,7 @@ class Pipeline():
             self._NNTest(DataSet,**kwargs)
 
             if self.wandb:
-                self.Logger.SaveConfig(self.HyperParameters)
+                # self.Logger.SaveConfig(self.HyperParameters)
 
                 intermediate = 10*torch.log10(self.MSE_test_linear_arr).detach().cpu().numpy()
 
@@ -336,6 +352,8 @@ class Pipeline():
 
 
             print(f'Test Loss: {self.MSE_test_dB_avg} [dB]')
+
+        self.save()
 
     def PlotResults(self,test_input,test_target,predictions):
         pass

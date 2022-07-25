@@ -119,6 +119,9 @@ class KalmanFilter():
         # Compute Kalman Gain
         self.KG = torch.bmm(self.Predicted_State_Covariance, torch.bmm(
             self.H.mT, torch.linalg.pinv(self.Predicted_Observation_Covariance)))
+        #TODO:
+        # self.KG = torch.zeros_like(self.KG)
+
 
     def Innovation(self,y):
 
@@ -238,6 +241,9 @@ class KalmanSmoother(KalmanFilter):
         self.SG = torch.bmm(self.Filtered_State_Covariance,
                             torch.bmm(self.F.mT,
                             torch.linalg.pinv(self.Predicted_State_Covariance)))
+        #TODO:
+        self.SG = torch.zeros_like(self.SG)
+    #
 
     def SCorrect(self):
 
@@ -390,9 +396,26 @@ class KalmanSmoother(KalmanFilter):
 
         self.Q_arr = 0.5 * Q_arr + 0.5 * Q_arr.mT
 
-        # window_size = 360
-        # Inter = self.Q_arr.unfold(1, window_size, 1).mean(-1)
-        # self.Q_arr = torch.cat((Inter, self.Q_arr[:,-window_size+1:]), dim=1)
+        # window_size = 7
+        # windowed_Q = torch.empty_like(Q_arr)
+        #
+        # for t in range(Q_arr.shape[1]):
+        #
+        #     if t == 360:
+        #         windowed_Q[:,-1,:,:] = Q_arr[:,-1]
+        #     elif t == 0:
+        #         windowed_Q[:,0] = Q_arr[:,0]
+        #     else:
+        #         upper = min(360,t+int(window_size/2))
+        #         lower = max(0,int(window_size/2))
+        #
+        #         mean = Q_arr[:,lower:upper].mean(1)
+        #         windowed_Q[:,t] = mean
+        #
+        # self.Q_arr = windowed_Q
+
+        # Inter = Q_arr.unfold(1, window_size, 1).mean(-1)
+        # self.Q_arr = torch.cat((Inter, Q_arr[:,-window_size+1:]), dim=1)
 
     def Average_EM_vars(self):
 

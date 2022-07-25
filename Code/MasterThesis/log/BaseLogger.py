@@ -129,27 +129,31 @@ class WandbLogger(LocalLogger):
     Class to Create File structure and save Runs of pytorch models.
     """
 
-    def __init__(self, name: str, BaseConfig={}) -> None:
+    def __init__(self, name: str, group = '',BaseConfig={}) -> None:
         """
         Initialize Class member
         :param ParentDirectory: Name of the parent directory
         :param kwargs: additional structures to be saved, along with their file-extension
         """
-
-        super(WandbLogger, self).__init__(name)
-
         self.BaseConfig = BaseConfig
 
         self.EntityName = 'tilocher-team'
         self.ProjectName = 'MasterThesis'
 
         # Init WandB
-        self.api = wandb.Api()
         wandb.login()
         wandb.init(project=self.ProjectName,
-                   name=self.RunFileName,
-                   group=self.ParentDirectory,
+                   name=name +'_'+ datetime.datetime.today().strftime('%d_%m___%H_%M'),
+                   group=group,
                    config=BaseConfig)
+
+        self.api = wandb.Api()
+
+
+
+        super(WandbLogger, self).__init__(name)
+
+
 
     def ForceClose(self) -> None:
         """
