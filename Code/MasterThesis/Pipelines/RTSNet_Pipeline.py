@@ -7,11 +7,11 @@ from matplotlib import pyplot as plt
 import wandb
 
 
-class KNet_Pipeline(Pipeline):
+class RTSNet_Pipeline(Pipeline):
 
-    def __init__(self, Logger, unsupervised=False, gpu=True, **kwargs):
+    def __init__(self,Logger,unsupervised = False,gpu = True, **kwargs):
 
-        super(KNet_Pipeline, self).__init__('KNet_Pipeline', Logger, gpu, **kwargs)
+        super(RTSNet_Pipeline, self).__init__('RTSNet_Pipeline',Logger,gpu, **kwargs)
 
         self.unsupervised = unsupervised
 
@@ -26,24 +26,33 @@ class KNet_Pipeline(Pipeline):
 
     def Run_Inference(self,input,target,**kwargs):
 
-
         T = input.shape[2]
 
         self.model.InitSequence(input[:,0,0,:].detach())
 
 
+        model_output_forward = torch.empty(self.model.batch_size,T,self.model.m,device=self.dev,requires_grad=False)
         model_output = torch.empty(self.model.batch_size,T,self.model.m,device=self.dev,requires_grad=False)
         y_pred = torch.empty(self.model.batch_size,T,self.model.n,device= self.dev, requires_grad= False)
 
+
         for t in range(T):
 
-            model_output[:,t] = self.model(input[:,:, t].squeeze(), t)
+            model_output_forward[:,t] = self.model(input[:,:, t].squeeze(), t,None,None,None)
             y_pred[:,t] = self.model.m1y.squeeze()
 
+        model_output[:,self.ssModel.T-1] = model_output_forward[:,self.ssModel.T-1]
+        self.model.InitBackward(model_output[:,self.ssModel.T-1])
+        model_output[:,self.ssModel.T-2] = self.model(None,self.ssModel.T-2,model_output_forward[:,self.ssModel.T-2],
+                                                      model_output_forward[:,self.ssModel.T-1],None)
+        for t in range(self.ssModel.T-3,-1,-1):
+            model_output[:,t] = self.model(None,t,model_output_forward[:,t],
+                                           model_output_forward[:,t+1],model_output[:,t+2])
+
         if self.unsupervised:
-            loss = self.loss_fn(y_pred, input.squeeze())
+            loss = self.loss_fn(y_pred,input.squeeze())
         else:
-            loss = self.loss_fn(model_output, target.squeeze())
+            loss = self.loss_fn(model_output,target.squeeze())
 
         return model_output, loss
 
@@ -76,11 +85,3 @@ class KNet_Pipeline(Pipeline):
                 wandb.log({'chart':plt})
             else:
                 plt.show()
-
-    def setModel(self, model):
-
-        self.model = model
-        # parameters = {'LatentSpace':model.latent_space_dim,
-        #               'NumChannels': model.num_channels}
-        #
-        # self.Logger.SaveConfig(parameters)

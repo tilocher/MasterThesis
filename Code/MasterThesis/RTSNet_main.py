@@ -6,8 +6,8 @@ from DataLoaders.PhysioNetLoader import PhyioNetLoader_MIT_NIH
 import yaml
 from yaml.loader import SafeLoader
 from log.BaseLogger import WandbLogger,LocalLogger
-from NNs.KalmanNet_nn_new_arch import KalmanNetNN
-from Pipelines.KNet_Pipeline import KNet_Pipeline
+from NNs.RTSNet_nn import RTSNetNN
+from Pipelines.RTSNet_Pipeline import RTSNet_Pipeline
 import os
 import wandb
 import copy
@@ -21,13 +21,13 @@ from SystemModels.Taylor_model import Taylor_model
 if __name__ == '__main__':
 
 
-    config = yaml.load(open('Configs/KNet.yaml'), Loader=SafeLoader)
+    config = yaml.load(open('Configs/RTSNet.yaml'), Loader=SafeLoader)
 
     UseWandb = config['wandb']
 
 
-    Logger = LocalLogger('KNet', BaseConfig=config) if not UseWandb else \
-        WandbLogger(name='KNet', BaseConfig=config)
+    Logger = LocalLogger('RTSNet', BaseConfig=config) if not UseWandb else \
+        WandbLogger(name='RTSNet', BaseConfig=config)
 
     config = Logger.GetConfig()
 
@@ -39,8 +39,12 @@ if __name__ == '__main__':
 
     roll = config['roll']
 
+    num_sets = config['Number of MIT-BIH sets']
 
-    loader = PhyioNetLoader_MIT_NIH(num_sets= 2, num_beats= 1,
+    num_heartbeats = config['NumberHeartbeats']
+
+
+    loader = PhyioNetLoader_MIT_NIH(num_sets= num_sets, num_beats= num_heartbeats,
                                     num_samples= signal_length, SNR_dB= snr, gpu= gpu,
                                     desired_shape= (1, signal_length, 2), roll= roll)
 
@@ -58,6 +62,8 @@ if __name__ == '__main__':
     TaylorModel = Taylor_model(taylor_order= config['TaylorOrder'],  window= config['Window'],
                                 window_size= config['WindowSize'], window_parameters = config['WindowParameter'])
 
+
+
     DataSet_length = len(Train_Loader)
 
     TrainDataset = DataLoader(Train_Loader, shuffle=False, batch_size=DataSet_length)
@@ -67,15 +73,57 @@ if __name__ == '__main__':
     TaylorModel.fit(train_inputs.squeeze().mT)
 
     ssModel = TaylorModel.GetSysModel(train_inputs.shape[-1],gpu= gpu)
+
+
+
     # self.ssModel.f = lambda x,t: x
     ssModel.InitSequence(torch.zeros((2, 1),device=dev), torch.eye(2,device=dev))
 
+    ##############################################################################################
+    ##############################################################################################
+    ##############################################################################################
 
-    nnModel = KalmanNetNN(gpu)
+    ssModel.GenerateSequence(ssModel.Q, ssModel.R, ssModel.T)
+
+    sample = ssModel.x.T[:, 0]
+
+    # plt.plot(self.ssModel.x.T, label = 'Learned Prior')
+    t = np.arange(start=0, stop=sample.shape[0] / (360), step=1 / (360))
+    fig, ax = plt.subplots(dpi=200)
+
+    ax.plot(t, sample, label='Learned Prior', color='g')
+    # ax.plot(t, noise[:, 0], label='Noisy observation', color='r', alpha=0.4)
+    ax.grid()
+    ax.legend()
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Amplitude [mV]')
+
+    axins = ax.inset_axes([0.05, 0.5, 0.4, 0.4])
+    axins.plot(t, sample, color='g')
+    axins.get_xaxis().set_visible(False)
+    axins.get_yaxis().set_visible(False)
+
+    x1, x2, y1, y2 = 0.4, 0.6, torch.min(sample).item(), torch.max(sample).item()
+    axins.set_xlim(x1, x2)
+    axins.set_ylim(y1, y2)
+    axins.set_xticklabels([])
+    axins.set_yticklabels([])
+    axins.grid()
+
+    ax.indicate_inset_zoom(axins, edgecolor="black")
+
+    plt.show()
+
+    ##############################################################################################
+    ##############################################################################################
+    ##############################################################################################
+
+
+    nnModel = RTSNetNN(gpu)
     nnModel.Build(ssModel)
 
 
-    ECG_Pipeline = KNet_Pipeline(Logger= Logger,unsupervised=config['unsupervised'], gpu = gpu)
+    ECG_Pipeline = RTSNet_Pipeline(Logger= Logger,unsupervised=config['unsupervised'], gpu = gpu)
     ECG_Pipeline.setModel(nnModel)
     ECG_Pipeline.setTrainingParams(weightDecay=config['L2'], n_Epochs=config['Epochs'], n_Batch=config['BatchSize'],
                                    learningRate=config['lr'], shuffle=True, split_ratio=0.7)

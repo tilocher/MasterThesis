@@ -106,19 +106,19 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         CenteredDataFileName = f'CenteredData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}_sets_{num_sets}.pt'
         NoisyDataFileName = f'NoisyData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}_sets_{num_sets}.pt'
 
-        if CenteredDataFileName in os.listdir(folderName):
-            self.centerd_data = torch.load(folderName + CenteredDataFileName).to(self.dev)
-            center_flag = False
-        else:
-            self.Center()
-            center_flag = True
+        # if CenteredDataFileName in os.listdir(folderName):
+        #     self.centerd_data = torch.load(folderName + CenteredDataFileName).to(self.dev)
+        #     center_flag = False
+        # else:
+        self.Center()
+        center_flag = True
 
-        if NoisyDataFileName in os.listdir(folderName):
-            self.noisy_dataset = torch.load(folderName + NoisyDataFileName).to(self.dev)
-            noisy_flag = False
-        else:
-            self.AddGaussianNoise(SNR_dB)
-            noisy_flag = True
+        # if NoisyDataFileName in os.listdir(folderName):
+        #     self.noisy_dataset = torch.load(folderName + NoisyDataFileName).to(self.dev)
+        #     noisy_flag = False
+        # else:
+        self.AddGaussianNoise(SNR_dB)
+        noisy_flag = True
 
         if plot_sample:
             self.PlotSample()

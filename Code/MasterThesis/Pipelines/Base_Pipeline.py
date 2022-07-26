@@ -15,18 +15,19 @@ import numpy as np
 
 class Pipeline():
 
-    def __init__(self, modelName,Logger, dev = 'gpu', **kwargs):
+    def __init__(self, modelName,Logger, gpu = True, **kwargs):
 
 
 
-        Logs = {'Models':'.pt', 'Pipelines':'.pt','ONNX_models':'.onnx','CV_Loss':'.pdf'}
+        Logs = {'Models':'.pt', 'Pipelines':'.pt','ONNX_models':'.onnx','CV_Loss':'.pdf', 'Train_Loss':'.pdf',
+                'SamplePlots':'.pdf'}
 
         if 'AdditionalLogs' in kwargs.keys(): Logs.update(kwargs['AdditionalLogs'])
 
         self.Logger = Logger
 
 
-        if torch.cuda.is_available() and dev == 'gpu':
+        if torch.cuda.is_available() and gpu:
             self.dev = torch.device("cuda:0")
             torch.set_default_tensor_type("torch.cuda.FloatTensor")
             print("using GPU!")
@@ -67,6 +68,9 @@ class Pipeline():
 
         self.model = model
 
+        if hasattr(model,'ssModel'):
+            self.setssModel(model.ssModel)
+
         if self.wandb: wandb.watch(self.model, log_freq = 10)
 
 
@@ -103,7 +107,7 @@ class Pipeline():
 
 
 
-    def InitModel(self,**kwargs):
+    def InitModel(self,Batch_size, **kwargs):
         raise NotImplementedError('Methode needs to be implemented outside of base-class')
 
     def Run_Inference(self,input,target,**kwargs):
@@ -137,16 +141,22 @@ class Pipeline():
 
         DataSet_length = len(DataSet)
 
-        self.Logger.SaveConfig({'Dataset Samples':DataSet_length})
+        self.Logger.SaveConfig({'Training Set Size':DataSet_length})
 
         N_train = int(self.Train_CV_split_ratio * DataSet_length)
         N_CV = DataSet_length - N_train
+
+        self.Logger.SaveConfig({'Train Samples':N_train,
+                                'CV Samples':N_CV})
+
 
         self.MSE_cv_linear_epoch = torch.empty([self.N_Epochs], requires_grad=False).to(self.dev, non_blocking=True)
         self.MSE_cv_dB_epoch = torch.empty([self.N_Epochs], requires_grad=False).to(self.dev, non_blocking=True)
 
         self.MSE_train_linear_epoch = torch.empty([self.N_Epochs], requires_grad=False).to(self.dev, non_blocking=True)
         self.MSE_train_dB_epoch = torch.empty([self.N_Epochs], requires_grad=False).to(self.dev, non_blocking=True)
+
+        self.MSE_batches = []
 
         ##############
         ### Epochs ###
@@ -171,8 +181,10 @@ class Pipeline():
         Train_Dataset, CV_Dataset = torch.utils.data.random_split(DataSet, [N_train, N_CV],
                                                                   generator=torch.Generator(device=self.dev))
 
-        for ti in Epoch_itter:
+        self.InitTraining(N_CV)
 
+        for ti in Epoch_itter:
+            # torch.autograd.set_detect_anomaly(True)
 
             #################################
             ### Validation Sequence Batch ###
@@ -184,7 +196,7 @@ class Pipeline():
             CV_Dataloader = DataLoader(CV_Dataset, shuffle=False, batch_size=N_CV)
 
 
-            self.InitModel(**kwargs)
+            self.InitModel(N_CV,**kwargs)
 
 
             for cv_input, cv_target in CV_Dataloader:
@@ -204,7 +216,7 @@ class Pipeline():
 
                 torch.save(self.model, self.Logger.GetLocalSaveName('Models'))
 
-                torch.onnx.export(self.model,cv_input,self.Logger.GetLocalSaveName('ONNX_models'))
+                # torch.onnx.export(self.model,cv_input,self.Logger.GetLocalSaveName('ONNX_models'))
 
 
             ###############################
@@ -217,19 +229,25 @@ class Pipeline():
             Train_DataLoader = DataLoader(Train_Dataset, batch_size=self.N_B, shuffle=self.shuffle,
                                           generator=torch.Generator(device=self.dev))
 
-            torch.random.manual_seed(3453)
-            self.InitModel(**kwargs)
+            torch.random.manual_seed(42)
 
 
-            MSE_train_linear_batch = torch.empty(Train_DataLoader.__len__(), device=self.dev, requires_grad=False)
+            # MSE_train_linear_batch = torch.empty(Train_DataLoader.__len__(), device=self.dev, requires_grad=False)
+            MSE_batch_current_Epochs  = []
+
+            self.InitTraining(self.N_B)
 
             for j, (train_input, train_target) in enumerate(Train_DataLoader):
 
+                if not train_input.shape[0] == self.N_B:
+                    continue
+
+                self.InitModel(self.N_B, **kwargs)
 
                 Inference_out, train_loss = self.Run_Inference(train_input, train_target, **kwargs)
 
-
-                MSE_train_linear_batch[j] = train_loss
+                self.MSE_batches.append(train_loss.detach().cpu().item())
+                MSE_batch_current_Epochs.append(train_loss.detach().cpu().item())
 
                 self.optimizer.zero_grad()
 
@@ -238,8 +256,8 @@ class Pipeline():
                 self.optimizer.step()
 
             # Average
-            self.MSE_train_linear_epoch[ti] = MSE_train_linear_batch.mean().detach()
-            self.MSE_train_dB_epoch[ti] = 10 * torch.log10(MSE_train_linear_batch.mean()).detach()
+            self.MSE_train_linear_epoch[ti] = np.mean(MSE_batch_current_Epochs)#MSE_train_linear_batch.mean().detach()
+            self.MSE_train_dB_epoch[ti] = 10*np.log10(self.MSE_train_linear_epoch[ti])#10 * torch.log10(MSE_train_linear_batch.mean()).detach()
 
             Epoch_train_loss_lin = self.MSE_train_linear_epoch[ti].item()
 
@@ -264,10 +282,13 @@ class Pipeline():
             if ti % 35 == 0 and ti != 0:
                 self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learningRate, weight_decay=self.weightDecay)
 
+        # Store Model to wandb
         if self.wandb:
             wandb.save(self.Logger.GetLocalSaveName('ONNX_models'),policy = 'now')
             wandb.save(self.Logger.GetLocalSaveName('Models'), policy = 'now')
 
+
+        # Plot CV Loss
         plt.plot(self.MSE_cv_dB_epoch.detach().cpu().numpy(),'*', label = 'CV Loss', color = 'r' )
         plt.xlabel('Iteration')
         plt.ylabel('MSE Loss [dB]')
@@ -279,6 +300,24 @@ class Pipeline():
             plt.show()
         plt.clf()
 
+        # Plot Train Loss
+        train_losses = np.array(self.MSE_batches)
+        not_outliers = np.abs(train_losses-train_losses.mean()) < 2*train_losses.std()
+
+
+
+        plt.plot(10*np.log10(train_losses[not_outliers]), '*', label='Train Batch Loss', color='r')
+        plt.xlabel('Batch')
+        plt.ylabel('MSE Loss [dB]')
+        plt.legend()
+        plt.grid()
+        plt.savefig(self.Logger.GetLocalSaveName('Train_Loss'))
+
+        if not self.wandb:
+            plt.show()
+        plt.clf()
+
+        # Save Pipeline
         self.save()
 
         return [self.MSE_cv_linear_epoch, self.MSE_cv_dB_epoch, self.MSE_train_linear_epoch, self.MSE_train_dB_epoch]
@@ -296,6 +335,7 @@ class Pipeline():
 
             if self.wandb:
                 # self.Logger.SaveConfig(self.HyperParameters)
+
 
                 intermediate = 10*torch.log10(self.MSE_test_linear_arr).detach().cpu().numpy()
 
@@ -321,6 +361,9 @@ class Pipeline():
 
         N_T = len(Test_Dataset)
 
+        self.Logger.SaveConfig({'Test Set Size':N_T})
+
+
         self.MSE_test_linear_arr = torch.empty([N_T],requires_grad= False)
 
         if hasattr(self.loss_fn,'reduction'):
@@ -334,6 +377,9 @@ class Pipeline():
         Test_Dataloader = DataLoader(Test_Dataset, shuffle=False, batch_size= N_T)
 
         with torch.no_grad():
+
+            self.InitModel(N_T,**kwargs)
+
 
             for test_input, test_target in Test_Dataloader:
 
@@ -356,4 +402,7 @@ class Pipeline():
         self.save()
 
     def PlotResults(self,test_input,test_target,predictions):
+        pass
+
+    def InitTraining(self,Batch_size,**kwargs):
         pass

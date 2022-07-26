@@ -13,6 +13,20 @@ import wandb
 from tqdm import trange
 from scipy.optimize import minimize
 from SystemModels.Extended_sysmdl import SystemModel
+from torch.autograd import Variable, Function
+
+# class Taylor_Forward(Function):
+#
+#     def __init__(self,coeffs,):
+#
+#
+#
+#     @staticmethod
+#     def forward(ctx,i):
+
+
+
+
 
 
 class Taylor_model():
@@ -136,7 +150,7 @@ class Taylor_model():
         # basis_functions = self.n_prediction_weight.reshape(-1,1).float() @ self.basis_functions.T
         # basis_functions = basis_functions.repeat((batch_size,1,1))
         # basis_functions = self.basis_functions.reshape((1,1,-1)).repeat((batch_size,self.window_size,1))
-        basis_functions = self.basis_functions.reshape((1, 1, -1)).repeat((batch_size, 1, 1))
+        basis_functions = self.basis_functions.reshape((1, 1, -1)).repeat((self.window_size,batch_size, 1))
 
         # weights = self.window_weights.repeat((batch_size,1,1))
 
@@ -154,20 +168,6 @@ class Taylor_model():
 
         padded_data = torch.nn.functional.pad(data, (-lower_bound, upper_bound), 'replicate')
 
-        def FuncToMin(params, obs, weights, basis):
-
-
-            estimate = np.matmul(basis,params.reshape(basis.shape[-1],-1)).squeeze()
-
-
-            loss = 0
-
-            for j in range(len(weights)):
-
-                vector = (obs[...,j] - estimate).unsqueeze(-1)
-                loss += weights[j]   * torch.bmm(vector.mT, vector)
-
-            return loss.mean().item()
 
         for t in trange(0, time_steps, desc = 'Calculating prior'):
 
@@ -176,16 +176,21 @@ class Taylor_model():
 
             target_tensor = (observations - current_state)
 
+            target_tensor = torch.transpose(target_tensor,0,-1).mT
 
-            phi = minimize(FuncToMin,np.zeros((self.taylor_order,channels)),args= (target_tensor,weights,basis_functions)).x
+
+            covariance = (torch.mm(self.basis_functions,self.basis_functions.T)*batch_size).repeat(self.window_size,1,1)
+
+            Y = torch.bmm(basis_functions.mT,target_tensor)
 
 
-            # target_tensor_W = target_tensor.mT.bmm(torch.sqrt(weights))
+            weighted_cov = (weights*torch.transpose(covariance,0 ,-1)).sum(-1)
+            weighted_Y = (weights * torch.transpose(Y, 0, -1)).sum(-1)
 
-            # c = torch.linalg.lstsq(basis_functions_w.mT,target_tensor_W.mT).solution
 
-            coefficients[...,t] = torch.from_numpy(phi.reshape(-1,channels))
+            theta = torch.mm(torch.linalg.pinv(weighted_cov),weighted_Y.T)
 
+            coefficients[...,t] = theta
 
 
         self.coefficients = coefficients
@@ -221,7 +226,9 @@ class Taylor_model():
         return coefficients
 
     def f(self,x,t):
-        return (x.squeeze() + (self.basis_functions.T @ self.coefficients[..., t]).squeeze()).unsqueeze(-1)
+        # basis = Variable(self.basis_functions.T)
+        # coeffs = Variable(self.coefficients[...,t])
+        return (x.squeeze() + (self.basis_functions.T @ self.coefficients[...,t] ).squeeze()).unsqueeze(-1)
         # return (x.squeeze()).reshape(-1, 1)
 
     @property

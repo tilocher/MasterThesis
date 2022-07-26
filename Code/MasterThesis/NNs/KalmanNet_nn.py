@@ -4,151 +4,117 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-
-import sys
-
-
-# from model import getJacobian
-
-if torch.cuda.is_available():
-    dev = torch.device("cuda:0")
-    torch.set_default_tensor_type("torch.cuda.FloatTensor")
-else:
-    dev = torch.device("cpu")
-
-in_mult = 5
-out_mult = 40
-nGRU = 4
-
 class KalmanNetNN(torch.nn.Module):
 
     ###################
     ### Constructor ###
     ###################
-    def __init__(self):
+    def __init__(self,gpu):
         super().__init__()
-    
-    def NNBuild(self, SysModel):
 
-        self.sysModel  = SysModel
+        if torch.cuda.is_available() and gpu:
+            dev = torch.device("cuda:0")
+            torch.set_default_tensor_type("torch.cuda.FloatTensor")
+        else:
+            dev = torch.device("cpu")
 
-        self.InitSystemDynamics(SysModel.f, SysModel.h, SysModel.m, SysModel.n, infoString = "partialInfo")
-        self.InitSequence(SysModel.m1x_0, SysModel.m2x_0, SysModel.T)
+        self.device = dev
+        self.to(self.device)
+    #############
+    ### Build ###
+    #############
+    def Build(self, ssModel):
+
+
+
+        self.InitSystemDynamics(ssModel.f, ssModel.h, ssModel.m, ssModel.n, infoString = "partialInfo")
+
+        self.ssModel = ssModel
+
+        self.T = ssModel.T
 
         # Number of neurons in the 1st hidden layer
-        #H1_KNet = (SysModel.m + SysModel.n) * (10) * 8
+        H1_KNet = (ssModel.m + ssModel.n) * (10) * 8
 
         # Number of neurons in the 2nd hidden layer
-        #H2_KNet = (SysModel.m * SysModel.n) * 1 * (4)
+        H2_KNet = (ssModel.m * ssModel.n) * 1 * (10)
 
-        self.InitKGainNet(SysModel.prior_Q, SysModel.prior_Sigma, SysModel.prior_S)
+        self.InitKGainNet(H1_KNet, H2_KNet)
 
     ######################################
     ### Initialize Kalman Gain Network ###
     ######################################
-    def InitKGainNet(self, prior_Q, prior_Sigma, prior_S):
+    def InitKGainNet(self, H1, H2):
+        # Input Dimensions
+        D_in = self.m + self.n  # x(t-1), y(t)
 
-        self.seq_len_input = 1
+        # Output Dimensions
+        D_out = self.m * self.n  # Kalman Gain
+
+        ###################
+        ### Input Layer ###
+        ###################
+        # Linear Layer
+        self.KG_l1 = torch.nn.Linear(D_in, H1, bias=True).to(self.device,non_blocking = True)
+
+        # ReLU (Rectified Linear Unit) Activation Function
+        self.KG_relu1 = torch.nn.ReLU()
+
+        ###########
+        ### GRU ###
+        ###########
+        # Input Dimension
+        self.input_dim = H1
+        # Hidden Dimension
+        self.hidden_dim = (self.m * self.m + self.n * self.n) * 10
+        # Number of Layers
+        self.n_layers = 1
+        # Batch Size
         self.batch_size = 1
+        # Input Sequence Length
+        self.seq_len_input = 1
+        # Hidden Sequence Length
+        self.seq_len_hidden = self.n_layers
 
-        self.prior_Q = prior_Q
-        self.prior_Sigma = prior_Sigma
-        self.prior_S = prior_S
-        
+        # batch_first = False
+        # dropout = 0.1 ;
 
+        # Initialize a Tensor for GRU Input
+        # self.GRU_in = torch.empty(self.seq_len_input, self.batch_size, self.input_dim)
 
-        # GRU to track Q
-        self.d_input_Q = self.m * in_mult
-        self.d_hidden_Q = self.m ** 2
-        self.GRU_Q = nn.GRU(self.d_input_Q, self.d_hidden_Q)
-        self.h_Q = torch.randn(self.seq_len_input, self.batch_size, self.d_hidden_Q).to(dev, non_blocking=True)
+        # Initialize a Tensor for Hidden State
+        self.hn = torch.randn(self.seq_len_hidden, self.batch_size, self.hidden_dim).to(self.device,non_blocking = True)
 
-        # GRU to track Sigma
-        self.d_input_Sigma = self.d_hidden_Q + self.m * in_mult
-        self.d_hidden_Sigma = self.m ** 2
-        self.GRU_Sigma = nn.GRU(self.d_input_Sigma, self.d_hidden_Sigma)
-        self.h_Sigma = torch.randn(self.seq_len_input, self.batch_size, self.d_hidden_Sigma).to(dev, non_blocking=True)
+        # Iniatialize GRU Layer
+        self.rnn_GRU = nn.GRU(self.input_dim, self.hidden_dim, self.n_layers).to(self.device,non_blocking = True)
 
-        # GRU to track S
-        self.d_input_S = self.n ** 2 + 2 * self.n * in_mult
-        self.d_hidden_S = self.n ** 2
-        self.GRU_S = nn.GRU(self.d_input_S, self.d_hidden_S)
-        self.h_S = torch.randn(self.seq_len_input, self.batch_size, self.d_hidden_S).to(dev, non_blocking=True)
+        ####################
+        ### Hidden Layer ###
+        ####################
+        self.KG_l2 = torch.nn.Linear(self.hidden_dim, H2, bias=True).to(self.device,non_blocking = True)
 
-        # Fully connected 1
-        self.d_input_FC1 = self.d_hidden_Sigma
-        self.d_output_FC1 = self.n ** 2
-        self.FC1 = nn.Sequential(
-                nn.Linear(self.d_input_FC1, self.d_output_FC1),
-                nn.ReLU())
+        # ReLU (Rectified Linear Unit) Activation Function
+        self.KG_relu2 = torch.nn.ReLU()
 
-        # Fully connected 2
-        self.d_input_FC2 = self.d_hidden_S + self.d_hidden_Sigma
-        self.d_output_FC2 = self.n * self.m
-        self.d_hidden_FC2 = self.d_input_FC2 * out_mult
-        self.FC2 = nn.Sequential(
-                nn.Linear(self.d_input_FC2, self.d_hidden_FC2),
-                nn.ReLU(),
-                nn.Linear(self.d_hidden_FC2, self.d_output_FC2))
-
-        # Fully connected 3
-        self.d_input_FC3 = self.d_hidden_S + self.d_output_FC2
-        self.d_output_FC3 = self.m ** 2
-        self.FC3 = nn.Sequential(
-                nn.Linear(self.d_input_FC3, self.d_output_FC3),
-                nn.ReLU())
-
-        # Fully connected 4
-        self.d_input_FC4 = self.d_hidden_Sigma + self.d_output_FC3
-        self.d_output_FC4 = self.d_hidden_Sigma
-        self.FC4 = nn.Sequential(
-                nn.Linear(self.d_input_FC4, self.d_output_FC4),
-                nn.ReLU())
-        
-        # Fully connected 5
-        self.d_input_FC5 = self.m
-        self.d_output_FC5 = self.m * in_mult
-        self.FC5 = nn.Sequential(
-                nn.Linear(self.d_input_FC5, self.d_output_FC5),
-                nn.ReLU())
-
-        # Fully connected 6
-        self.d_input_FC6 = self.m
-        self.d_output_FC6 = self.m * in_mult
-        self.FC6 = nn.Sequential(
-                nn.Linear(self.d_input_FC6, self.d_output_FC6),
-                nn.ReLU())
-        
-        # Fully connected 7
-        self.d_input_FC7 = 2 * self.n
-        self.d_output_FC7 = 2 * self.n * in_mult
-        self.FC7 = nn.Sequential(
-                nn.Linear(self.d_input_FC7, self.d_output_FC7),
-                nn.ReLU())
-
-        """
-        # Fully connected 8
-        self.d_input_FC8 = self.d_hidden_Q
-        self.d_output_FC8 = self.d_hidden_Q
-        self.d_hidden_FC8 = self.d_hidden_Q * Q_Sigma_mult
-        self.FC8 = nn.Sequential(
-                nn.Linear(self.d_input_FC8, self.d_hidden_FC8),
-                nn.ReLU(),
-                nn.Linear(self.d_hidden_FC8, self.d_output_FC8))
-        """
+        ####################
+        ### Output Layer ###
+        ####################
+        self.KG_l3 = torch.nn.Linear(H2, D_out, bias=True).to(self.device,non_blocking = True)
+        # torch.nn.init.constant_(self.KG_l3.weight, 0)
+        # torch.nn.init.constant_(self.KG_l3.bias, 0)
 
     ##################################
     ### Initialize System Dynamics ###
     ##################################
-    def InitSystemDynamics(self, f, h, m, n, infoString = 'fullInfo'):
-        
-        if(infoString == 'partialInfo'):
-            self.fString ='ModInacc'
-            self.hString ='ObsInacc'
+    def InitSystemDynamics(self, f, h, m, n, infoString='fullInfo'):
+
+        if (infoString == 'partialInfo'):
+            self.fString = 'ModInacc'
+            self.hString = 'ObsInacc'
         else:
-            self.fString ='ModAcc'
-            self.hString ='ObsAcc'
-        
+            self.fString = 'ModAcc'
+            self.hString = 'ObsAcc'
+
         # Set State Evolution Function
         self.f = f
         self.m = m
@@ -157,191 +123,131 @@ class KalmanNetNN(torch.nn.Module):
         self.h = h
         self.n = n
 
+
+
+
     ###########################
     ### Initialize Sequence ###
     ###########################
-    def InitSequence(self, M1_0, M2_0, T):
-        self.T = T
-        self.x_out = torch.empty(self.m, T).to(dev, non_blocking=True)
+    def InitSequence(self, M1_0):
 
-        self.m1x_posterior = torch.squeeze(M1_0).to(dev, non_blocking=True)
-        self.m1x_posterior_previous = self.m1x_posterior.to(dev, non_blocking=True)
-        self.m1x_prior_previous = self.m1x_posterior.to(dev, non_blocking=True)
-        self.y_previous = self.h(self.m1x_posterior,0).to(dev, non_blocking=True)
+        self.m1x_prior = M1_0.to(self.device,non_blocking = True)
 
-        # KGain saving
-        # self.i = 0
-        # self.KGain_array = self.KG_array = torch.zeros((self.T,self.m,self.n)).to(dev, non_blocking=True)
+        self.m1x_posterior = M1_0.to(self.device,non_blocking = True)
+
+        self.state_process_posterior_0 = M1_0.to(self.device,non_blocking = True)
 
     ######################
     ### Compute Priors ###
     ######################
     def step_prior(self,t):
+
+
         # Predict the 1-st moment of x
-        self.m1x_prior = torch.squeeze(self.f(self.m1x_posterior,t))
+        self.m1x_prev_prior = self.m1x_prior
+
+        self.m1x_prior = torch.squeeze(self.f(self.m1x_posterior, t))
 
         # Predict the 1-st moment of y
-        self.m1y = torch.squeeze(self.h(self.m1x_prior,t))
+        self.m1y = torch.squeeze(self.h(self.m1x_prior, t))
 
     ##############################
     ### Kalman Gain Estimation ###
     ##############################
     def step_KGain_est(self, y):
 
-        obs_diff = y - torch.squeeze(self.y_previous)
-        obs_innov_diff = y - torch.squeeze(self.m1y)
-        fw_evol_diff = torch.squeeze(self.m1x_posterior) - torch.squeeze(self.m1x_posterior_previous)
-        fw_update_diff = torch.squeeze(self.m1x_posterior) - torch.squeeze(self.m1x_prior_previous)
+        # Reshape and Normalize the difference in X prior
+        #dm1x = self.m1x_prior - self.state_process_prior_0
+        dm1x = self.m1x_posterior - self.m1x_prev_prior
+        dm1x_reshape = torch.squeeze(dm1x)
+        dm1x_norm = func.normalize(dm1x_reshape, p=2, dim=0, eps=1e-12, out=None)
 
-        obs_diff = func.normalize(obs_diff, p=2, dim=0, eps=1e-12, out=None)
-        obs_innov_diff = func.normalize(obs_innov_diff, p=2, dim=0, eps=1e-12, out=None)
-        fw_evol_diff = func.normalize(fw_evol_diff, p=2, dim=0, eps=1e-12, out=None)
-        fw_update_diff = func.normalize(fw_update_diff, p=2, dim=0, eps=1e-12, out=None)
+        # Normalize y
+        dm1y = y - torch.squeeze(self.m1y)
+        dm1y_norm = func.normalize(dm1y, p=2, dim=0, eps=1e-12, out=None)
 
+        # KGain Net Input
+        KGainNet_in = torch.cat([dm1y_norm, dm1x_norm], dim=-1)
+        # KGainNet_in = torch.cat([KGainNet_in,y],dim = 0)
 
         # Kalman Gain Network Step
-        KG = self.KGain_step(obs_diff, obs_innov_diff, fw_evol_diff, fw_update_diff)
+        KG = self.KGain_step(KGainNet_in)
+
 
         # Reshape Kalman Gain to a Matrix
-        self.KGain = torch.reshape(KG, (self.m, self.n))
+        self.KGain = torch.reshape(KG, (-1,self.m, self.n))
+        # del KG,KGainNet_in,dm1y,dm1x,dm1y_norm,dm1x_norm,dm1x_reshape
+
 
     #######################
     ### Kalman Net Step ###
     #######################
     def KNet_step(self, y,t):
-
         # Compute Priors
         self.step_prior(t)
+
+        # y = (y.reshape((self.n,1))-self.m1y).squeeze()
 
         # Compute Kalman Gain
         self.step_KGain_est(y)
 
-        # Save KGain in array
-        # self.KGain_array[self.i] = self.KGain
-        # self.i += 1
-
         # Innovation
-        # y_obs = torch.unsqueeze(y, 1)
-        dy = y - self.m1y
+        y_obs = torch.unsqueeze(y, 1)
+        dy = y_obs.squeeze() - self.m1y
 
         # Compute the 1-st posterior moment
-        INOV = torch.matmul(self.KGain, dy)
-        self.m1x_posterior_previous = self.m1x_posterior
-        self.m1x_posterior = self.m1x_prior + INOV
+        INOV = torch.bmm(self.KGain, dy.unsqueeze(-1))
+        self.m1x_posterior = self.m1x_prior + INOV.squeeze()
 
-        #self.state_process_posterior_0 = self.state_process_prior_0
-        self.m1x_prior_previous = self.m1x_prior
+        del INOV,dy,y_obs
 
-        # update y_prev
-        self.y_previous = y
+        return torch.squeeze(self.m1x_posterior )
 
-        # return
-        return torch.squeeze(self.m1x_posterior)
 
     ########################
     ### Kalman Gain Step ###
     ########################
-    def KGain_step(self, obs_diff, obs_innov_diff, fw_evol_diff, fw_update_diff):
+    def KGain_step(self, KGainNet_in):
 
-        def expand_dim(x):
-            expanded = torch.empty(self.seq_len_input, self.batch_size, x.shape[-1])
-            expanded[0, 0, :] = x
-            return expanded
+        ###################
+        ### Input Layer ###
+        ###################
+        L1_out = self.KG_l1(KGainNet_in);
+        La1_out = self.KG_relu1(L1_out);
 
-        obs_diff = expand_dim(obs_diff)
-        obs_innov_diff = expand_dim(obs_innov_diff)
-        fw_evol_diff = expand_dim(fw_evol_diff)
-        fw_update_diff = expand_dim(fw_update_diff)
+        ###########
+        ### GRU ###
+        ###########
+        GRU_in = torch.empty(self.seq_len_input, self.batch_size, self.input_dim).to(self.device,non_blocking = True)
+        GRU_in[0, :, :] = La1_out
+        GRU_out, self.hn = self.rnn_GRU(GRU_in, self.hn)
+        GRU_out_reshape = torch.reshape(GRU_out, (1,-1, self.hidden_dim))
 
         ####################
-        ### Forward Flow ###
+        ### Hidden Layer ###
         ####################
-        
-        # FC 5
-        in_FC5 = fw_evol_diff
-        out_FC5 = self.FC5(in_FC5)
+        L2_out = self.KG_l2(GRU_out_reshape)
+        La2_out = self.KG_relu2(L2_out)
 
-        # Q-GRU
-        in_Q = out_FC5
-        out_Q, self.h_Q = self.GRU_Q(in_Q, self.h_Q)
-
-        """
-        # FC 8
-        in_FC8 = out_Q
-        out_FC8 = self.FC8(in_FC8)
-        """
-
-        # FC 6
-        in_FC6 = fw_update_diff
-        out_FC6 = self.FC6(in_FC6)
-
-        # Sigma_GRU
-        in_Sigma = torch.cat((out_Q, out_FC6), 2)
-        out_Sigma, self.h_Sigma = self.GRU_Sigma(in_Sigma, self.h_Sigma)
-
-        # FC 1
-        in_FC1 = out_Sigma
-        out_FC1 = self.FC1(in_FC1)
-
-        # FC 7
-        in_FC7 = torch.cat((obs_diff, obs_innov_diff), 2)
-        out_FC7 = self.FC7(in_FC7)
-
-
-        # S-GRU
-        in_S = torch.cat((out_FC1, out_FC7), 2)
-        out_S, self.h_S = self.GRU_S(in_S, self.h_S)
-
-
-        # FC 2
-        in_FC2 = torch.cat((out_Sigma, out_S), 2)
-        out_FC2 = self.FC2(in_FC2)
-
-        #####################
-        ### Backward Flow ###
-        #####################
-
-        # FC 3
-        in_FC3 = torch.cat((out_S, out_FC2), 2)
-        out_FC3 = self.FC3(in_FC3)
-
-        # FC 4
-        in_FC4 = torch.cat((out_Sigma, out_FC3), 2)
-        out_FC4 = self.FC4(in_FC4)
-
-        # updating hidden state of the Sigma-GRU
-        self.h_Sigma = out_FC4
-
-        return out_FC2
+        ####################
+        ### Output Layer ###
+        ####################
+        self.L3_out = self.KG_l3(La2_out)
+        del L2_out,La2_out,GRU_out,GRU_in,GRU_out_reshape,L1_out,La1_out
+        return self.L3_out
 
     ###############
     ### Forward ###
     ###############
-    def forward(self, y,t):
-        y = torch.squeeze(y).to(dev, non_blocking=True)
-
-        '''
-        for t in range(0, self.T):
-            self.x_out[:, t] = self.KNet_step(y[:, t])
-        '''
-        self.x_out = self.KNet_step(y,t)
-
-        return self.x_out
+    def forward(self, yt, t):
+        yt = yt.to(self.device,non_blocking = True)
+        return self.KNet_step(yt,t)
 
     #########################
     ### Init Hidden State ###
     #########################
-    def init_hidden(self):
+    def init_hidden(self,batch_size):
+        self.batch_size = batch_size
         weight = next(self.parameters()).data
-        hidden = weight.new(1, self.batch_size, self.d_hidden_S).zero_()
-        self.h_S = hidden.data
-        self.h_S[0, 0, :] = self.prior_S.flatten()
-        hidden = weight.new(1, self.batch_size, self.d_hidden_Sigma).zero_()
-        self.h_Sigma = hidden.data
-        self.h_Sigma[0, 0, :] = self.prior_Sigma.flatten()
-        hidden = weight.new(1, self.batch_size, self.d_hidden_Q).zero_()
-        self.h_Q = hidden.data
-        self.h_Q[0, 0, :] = self.prior_Q.flatten()
-
-
-
+        hidden = weight.new(self.n_layers, self.batch_size, self.hidden_dim).zero_()
+        self.hn = hidden.data

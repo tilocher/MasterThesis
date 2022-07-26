@@ -110,13 +110,14 @@ class LocalLogger():
 
     def ForceClose(self) -> None:
         """
-        Function to delete all files that have been created if an error occures.
+        Function to delete all files that have been created if an error occurs.
         Added to prevent cluttering of files.
         :return:
         """
         # pass
         # Delete all created files
         if self.RunFileName in os.listdir(self.BaseRunFolderName): shutil.rmtree(self.RunFolderName)
+        print('Successfully removed all files')
 
 
     def GetConfig(self):
