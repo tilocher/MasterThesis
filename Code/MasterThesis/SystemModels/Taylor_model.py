@@ -161,6 +161,8 @@ class Taylor_model():
 
 
         coefficients = torch.zeros((self.taylor_order,channels, time_steps))
+        covariances = torch.zeros((self.taylor_order, self.taylor_order, time_steps))
+
         half_window = int(self.window_size/2)
 
         lower_bound = - half_window
@@ -171,7 +173,7 @@ class Taylor_model():
 
         for t in trange(0, time_steps, desc = 'Calculating prior'):
 
-            current_state = padded_data[:,:,t -lower_bound-half_window :t+half_window - lower_bound + 1]#.reshape((-1,1))
+            current_state = padded_data[:,:,t -lower_bound-half_window :t+half_window - lower_bound + 1]
             observations = padded_data[:,:,t -lower_bound-half_window+1 :t+half_window - lower_bound + 2]
 
             target_tensor = (observations - current_state)
@@ -191,9 +193,11 @@ class Taylor_model():
             theta = torch.mm(torch.linalg.pinv(weighted_cov),weighted_Y.T)
 
             coefficients[...,t] = theta
+            covariances[...,t] = weighted_cov
 
 
         self.coefficients = coefficients
+        self.covariances = covariances
 
         return coefficients
 
@@ -226,10 +230,8 @@ class Taylor_model():
         return coefficients
 
     def f(self,x,t):
-        # basis = Variable(self.basis_functions.T)
-        # coeffs = Variable(self.coefficients[...,t])
+        t = t + self.offset
         return (x.squeeze() + (self.basis_functions.T @ self.coefficients[...,t] ).squeeze()).unsqueeze(-1)
-        # return (x.squeeze()).reshape(-1, 1)
 
     @property
     def gradients(self):
@@ -249,12 +251,17 @@ class Taylor_model():
     def HJacobian(self,x, t):
         return torch.eye(self.channels)
 
-    def GetSysModel(self,channels,gpu = False):
+    def GetSysModel(self,channels,timesteps = None, offset = 0, gpu = False):
 
+
+        self.offset = offset
+
+        if timesteps == None:
+            timesteps = self.time_steps
 
         if gpu:
             dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-            self.ssModel = SystemModel(self.f, 0, self.h, 0, self.time_steps, self.time_steps, channels,
+            self.ssModel = SystemModel(self.f, 0, self.h, 0, timesteps, timesteps, channels,
                                        channels)
 
             self.basis_functions = self.basis_functions.to(dev)
@@ -262,11 +269,56 @@ class Taylor_model():
             self.ssModel.setHJac(self.HJacobian)
 
 
-        self.ssModel = SystemModel(self.f, 0, self.h, 0,self.time_steps, self.time_steps,channels,channels)
+        self.ssModel = SystemModel(self.f, 0, self.h, 0,timesteps, timesteps,channels,channels)
         self.ssModel.setFJac(self.FJacobian)
         self.ssModel.setHJac(self.HJacobian)
 
 
 
         return self.ssModel
+
+    def Identity(self, x, t):
+        return x
+
+    def UpdateWeights(self,y):
+        """
+        Function to update weights recursively online
+        :param:
+        x: Current state
+        y: New Observation
+        t: timestep of the weights
+        """
+        gamma = 0.97
+        Current_weights = torch.transpose(self.coefficients,0,-1)
+        Current_covariance = torch.transpose(self.covariances,0,-1)
+
+        batched_basis = self.basis_functions.unsqueeze(0).repeat(self.time_steps,1,self.window_size)
+        y = torch.nn.functional.pad(y.squeeze(), (0,0,self.window_size,0), 'constant')
+        y = y.unfold(0,self.window_size,1)
+
+
+
+        prediction = y[:-1] + torch.bmm(torch.transpose(self.coefficients,0,-1),
+                                             batched_basis).squeeze()
+
+
+        Innovation = (y[1:] - prediction) *  torch.diag(self.window_weights)
+
+        Gain = torch.bmm(Current_covariance,batched_basis)
+
+        Var = torch.bmm(batched_basis.mT,torch.bmm(Current_covariance,batched_basis))*  torch.diag(self.window_weights)
+
+        Gain = torch.bmm(Gain, torch.linalg.pinv(gamma + Var))
+
+        Updated_weights = Current_weights + torch.bmm(Gain,Innovation.mT).mT
+
+        Updated_covariance = 1/gamma*(Current_covariance -  torch.bmm(Gain,
+                                                            torch.bmm(batched_basis.mT, Current_covariance)))
+
+        self.coefficients = torch.transpose(Updated_weights,0,-1)
+        self.covariances = torch.transpose(Updated_covariance,0,-1)
+
+
+
+
 

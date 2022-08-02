@@ -41,8 +41,8 @@ class RTSNet_Pipeline(Pipeline):
             model_output_forward[:,t] = self.model(input[:,:, t].squeeze(), t,None,None,None)
             y_pred[:,t] = self.model.m1y.squeeze()
 
-        model_output[:,self.ssModel.T-1] = model_output_forward[:,self.ssModel.T-1]
-        self.model.InitBackward(model_output[:,self.ssModel.T-1])
+        model_output[:,self.ssModel.T-1] = model_output_forward[:,-1]
+        self.model.InitBackward(model_output[:,-1])
         model_output[:,self.ssModel.T-2] = self.model(None,self.ssModel.T-2,model_output_forward[:,self.ssModel.T-2],
                                                       model_output_forward[:,self.ssModel.T-1],None)
         for t in range(self.ssModel.T-3,-1,-1):
@@ -68,20 +68,52 @@ class RTSNet_Pipeline(Pipeline):
 
         for i in range(num_samples):
 
-            random_sample_index = np.random.randint(0,test_input.shape[0])
+            # random_sample_index = np.random.randint(0,test_input.shape[0])
             # random_sample_index = np.random.randint(0,test_input.shape[0])
 
-            random_channel =  np.random.randint(0,2)
+            # random_channel =  np.random.randint(0,2)
 
-            plt.plot(test_input[random_sample_index,:,random_channel].detach().cpu(), label = 'Observations', alpha = 0.4, color = 'r')
-            plt.plot(test_target[random_sample_index,:,random_channel].detach().cpu(), label = 'Ground truth',color = 'g')
-            plt.plot(predictions[random_sample_index,:,random_channel].detach().cpu(), label = 'Prediction', color = 'b')
-            plt.title(f'Test Sample from channel {random_channel}')
-            plt.xlabel('Time Steps')
-            plt.ylabel('Amplitude [mV]')
+            fig, ax = plt.subplots(dpi=200)
+
+            random_sample_index = i
+            random_channel = 0
+
+            ax.plot(test_input[random_sample_index, :, random_channel].detach().cpu(), label='Observations', alpha=0.4,
+                    color='r')
+            ax.plot(test_target[random_sample_index, :, random_channel].detach().cpu(), label='Ground truth',
+                    color='g')
+            ax.plot(predictions[random_sample_index, :, random_channel].detach().cpu(), label='Prediction', color='b')
+            ax.set_title(f'Test Sample from channel {random_channel}')
+            ax.set_xlabel('Time Steps')
+            ax.set_ylabel('Amplitude [mV]')
             plt.legend()
-            plt.savefig(self.Logger.GetLocalSaveName('SamplePlots',prefix=f'{i}_'))
+
+            axins = ax.inset_axes([0.05, 0.5, 0.4, 0.4])
+
+            axins.plot(test_target[random_sample_index, :, random_channel].detach().cpu(), color='g')
+            axins.plot(predictions[random_sample_index, :, random_channel].detach().cpu(), color='b')
+            axins.get_xaxis().set_visible(False)
+            axins.get_yaxis().set_visible(False)
+
+            x1, x2, y1, y2 = int(0.4 * 360), int(0.6 * 360), torch.min(
+                torch.min(test_target[random_sample_index, :, random_channel].detach().cpu()),
+                torch.min(predictions[random_sample_index, :, random_channel].detach().cpu())).item(), \
+                             torch.max(torch.max(test_target[random_sample_index, :, random_channel].detach().cpu()),
+                                       torch.max(
+                                           predictions[random_sample_index, :, random_channel].detach().cpu())).item()
+            axins.set_xlim(x1, x2)
+            axins.set_ylim(y1, y2)
+            axins.set_xticklabels([])
+            axins.set_yticklabels([])
+            axins.grid()
+
+            ax.indicate_inset_zoom(axins, edgecolor="black")
+
+            plt.savefig(self.Logger.GetLocalSaveName('SamplePlots', prefix=f'{i}_'))
+
             if self.wandb:
-                wandb.log({'chart':plt})
+                wandb.log({'chart': plt})
+                plt.clf()
+
             else:
                 plt.show()

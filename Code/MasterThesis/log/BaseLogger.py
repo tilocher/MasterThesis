@@ -1,21 +1,24 @@
 import datetime
 
-import torch
 import wandb
 import os
-import atexit
 import shutil
 import yaml
 
 
 class LocalLogger():
+    log_location = os.path.realpath(r"E:\MasterThesis\log")
 
     def __init__(self, name, BaseConfig={}):
 
         self.ParentDirectory = name
 
         # Folder where this file is located
-        self.Base_folder = os.path.relpath(os.path.dirname(os.path.realpath(__file__)), os.getcwd())
+        # self.Base_folder = os.path.relpath(os.path.dirname(os.path.realpath(__file__)), os.getcwd())
+        if os.path.isdir(self.log_location):
+            self.Base_folder = self.log_location
+        else:
+            self.Base_folder = os.path.relpath(os.path.dirname(os.path.realpath(__file__)), os.getcwd())
 
         self.Config = BaseConfig
 
@@ -43,8 +46,6 @@ class LocalLogger():
         # Calculate the next number for the filing system
         if not self.ParentDirectory in os.listdir(self.Base_folder + '/runs'):
             os.makedirs(self.BaseRunFolderName)
-
-
 
         # Filename with numbering system
         self.RunFileName = datetime.datetime.today().strftime('%d_%m___%H_%M')

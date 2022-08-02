@@ -239,7 +239,7 @@ class Pipeline():
 
             for j, (train_input, train_target) in enumerate(Train_DataLoader):
 
-                if not train_input.shape[0] == self.N_B:
+                if not isinstance(train_input,list) and not train_input.shape[0] == self.N_B:
                     continue
 
                 self.InitModel(self.N_B, **kwargs)
@@ -257,7 +257,7 @@ class Pipeline():
 
             # Average
             self.MSE_train_linear_epoch[ti] = np.mean(MSE_batch_current_Epochs)#MSE_train_linear_batch.mean().detach()
-            self.MSE_train_dB_epoch[ti] = 10*np.log10(self.MSE_train_linear_epoch[ti])#10 * torch.log10(MSE_train_linear_batch.mean()).detach()
+            self.MSE_train_dB_epoch[ti] = 10*np.log10(self.MSE_train_linear_epoch[ti].cpu().detach())#10 * torch.log10(MSE_train_linear_batch.mean()).detach()
 
             Epoch_train_loss_lin = self.MSE_train_linear_epoch[ti].item()
 

@@ -5,11 +5,12 @@ import torch
 from torch import nn
 from numpy import ceil,log,power
 import time
+from torch.nn import functional as F
 
 
 
 def next_power_of_two(x):
-    return int(power(2, ceil(log(x) / log(2))))
+    return int(power(2, ceil(log(ceil(x)) / log(2))))
 
 class AutoEncoder(torch.nn.Module):
 
@@ -62,7 +63,7 @@ class AutoEncoder(torch.nn.Module):
 
         x = self.Encoder(x)
 
-        x = self.Decoder(x)
+        x = self.Decoder(x,self.Encoder.InferenceShape)
 
         return x
 
@@ -131,6 +132,8 @@ class Encoder(torch.nn.Module):
             Conv = nn.Conv2d(in_channels= in_channel, out_channels = out_channel,
                           kernel_size= kernel, stride= stride,dilation= dilation,device= self.dev)
 
+            Conv.TargetSize = target_size
+
             # Add to the Module list
             self.ConvLayers.append(Conv)
             self.PaddingLayers.append(Pad)
@@ -146,16 +149,32 @@ class Encoder(torch.nn.Module):
     def forward(self,x):
 
         # x = nn.functional.normalize(x,dim = 2)
+        self.InferenceShape = x.shape[-2]
+        input_size = x.shape[-2]
 
         for Conv,Pad,BNorm, Relu in zip(self.ConvLayers,self.PaddingLayers,self.BatchNormLayers,self.ReLU):
 
-            x = Pad(x)
+            # x = Pad(x)
+
+            # Each layer should shrink the signal length to the next power of two
+            target_size = Conv.TargetSize
+
+            # Calculate necessary padding
+            pad_H = int(((target_size - 1) * Conv.stride[0] - input_size + Conv.dilation[0] * (Conv.kernel_size[0] - 1) + 1) / 2)
+            pad_W = 1
+
+            padding = (pad_W, 0, pad_H, pad_H)
+
+            x = F.pad(x,padding)
 
             x = Conv(x)
 
             x = Relu(x)
 
             x = BNorm(x)
+
+            # Update the input sizes
+            input_size = target_size
 
         x = self.Flatten(x)
 
@@ -241,21 +260,37 @@ class Decoder(nn.Module):
 
     # Define Forward pass of the decoder
 
-    def forward(self, x):
+    def forward(self, x, shape):
+
+        input_size = self.conv_dim[-2]
 
         x = self.LinearLayer(x)
 
         x = x.reshape((-1,)+ self.conv_dim)
 
-        for Conv, Pad, BNorm, Relu in zip(self.DeconvLayers, self.PaddingLayers, self.BatchNormLayers, self.ReLU):
+
+
+        for j,(Conv, Pad, BNorm, Relu) in enumerate(zip(self.DeconvLayers, self.PaddingLayers, self.BatchNormLayers, self.ReLU)):
 
             x = Conv(x)
 
-            x = Pad(x)
+            # x = Pad(x)
+            target_size = next_power_of_two(input_size * 2) if j != len(self.DeconvLayers)-1 else shape
+
+
+            # Calculate necessary padding
+            pad_H = int(((input_size - 1) * Conv.stride[0] - target_size + Conv.dilation[0] * (Conv.kernel_size[0] - 1) + 1) / 2)
+            pad_W = 1
+            padding = (-pad_W, 0, -pad_H, -pad_H)
+
+            x = F.pad(x,padding)
 
             x = Relu(x)
 
             x = BNorm(x)
+
+            input_size = target_size
+
 
         return x
 

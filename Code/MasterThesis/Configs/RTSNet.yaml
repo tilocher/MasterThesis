@@ -1,10 +1,11 @@
 # General Parameters
-Number of MIT-BIH sets: 4 # The MIT-BIH dataset is split into multiple files
+Number of MIT-BIH sets: 1 # The MIT-BIH dataset is split into multiple files
 NumberHeartbeats: 1 # How many heartbeats should be considered
-snr: 3 # in [dB]
+snr: 0 # in [dB]
 signal_length: 360 # Timesteps in an ecg signal
 gpu: False # Whether we want to try to use a gpu or not
 wandb: False
+WandbGroup: 'RTSNetSweep'
 roll: 0
 
 # Taylor Model parameters
@@ -14,7 +15,7 @@ WindowParameter: 0.7
 TaylorOrder: 5
 
 # NN Parameters
-Epochs: 3
+Epochs: 5
 L2: 1.0e-6
 lr: 1.0e-3
 BatchSize: 32

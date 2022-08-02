@@ -27,6 +27,8 @@ class KalmanFilter():
         self.em_vars = em_vars if not em_vars == 'all' else ['R', 'Q', 'F', 'H', 'Mu', 'Sigma']
         self.em_averages = list(set(em_vars).intersection(em_averages))
 
+        self.OnlyPrior = False
+
     def f_batch(self,state,t):
         return torch.stack([self.f(x,t) for x in state ])
 
@@ -59,6 +61,9 @@ class KalmanFilter():
             else:
                 return self.R_arr[:, t]
 
+    def ResetQR(self):
+        self.Q_arr = None
+        self.R_arr = None
 
     def InitSequence(self,InitialMean = None, InitialCovariance = None):
 
@@ -119,8 +124,9 @@ class KalmanFilter():
         # Compute Kalman Gain
         self.KG = torch.bmm(self.Predicted_State_Covariance, torch.bmm(
             self.H.mT, torch.linalg.pinv(self.Predicted_Observation_Covariance)))
-        #TODO:
-        # self.KG = torch.zeros_like(self.KG)
+
+        if self.OnlyPrior:
+            self.KG = torch.zeros_like(self.KG)
 
 
     def Innovation(self,y):
@@ -241,9 +247,10 @@ class KalmanSmoother(KalmanFilter):
         self.SG = torch.bmm(self.Filtered_State_Covariance,
                             torch.bmm(self.F.mT,
                             torch.linalg.pinv(self.Predicted_State_Covariance)))
-        #TODO:
-        self.SG = torch.zeros_like(self.SG)
-    #
+
+        if self.OnlyPrior:
+            self.SG = torch.zeros_like(self.SG)
+
 
     def SCorrect(self):
 
@@ -296,7 +303,7 @@ class KalmanSmoother(KalmanFilter):
 
             self.Pariwise_Covariances[:,t] = torch.bmm(self.Smoothed_State_Covariance, self.SG.mT)
 
-    def em(self,num_itts, Observations,T, q_2 ,r_2, states = None):
+    def em(self, Observations: torch.Tensor,T: int, q_2: float,r_2: float,num_itts:int = 20, states:torch.Tensor = None):
 
         with torch.no_grad():
 
@@ -423,44 +430,8 @@ class KalmanSmoother(KalmanFilter):
             self.__setattr__(f'{value}_arr', self.__getattribute__(f'{value}_arr').mean(1))
 
 
+    def SetOnlyPrior(self):
+        self.OnlyPrior = True
 
-
-
-
-
-
-
-
-        
-        
-
-if __name__ == '__main__':
-
-    torch.set_default_tensor_type(torch.DoubleTensor)
-
-    torch.random.manual_seed(421)
-
-    loss_fn = torch.nn.MSELoss()
-
-    ssModel = SystemModel(lambda x,t: x,1, lambda x,t:x[:2], 1,360,360,3,2)
-    ssModel.InitSequence(torch.zeros((3)), torch.eye(3))
-    ssModel.GenerateBatch(10, 360)
-    state,obs = ssModel.Target, ssModel.Input
-    kf = KalmanSmoother(ssModel, em_vars= 'all')
-
-    kf.InitSequence(torch.zeros((10,3,1)), torch.eye(3).unsqueeze(0).repeat(10,1,1))
-    # kf.InitSequence(torch.zeros((3,1)), torch.eye(3))
-    kf.smooth(obs.mT, 360)
-
-    print(10*torch.log10(loss_fn(kf.Smoothed_State_Means.squeeze(),state.mT)).item())
-
-    # import pykalman
-    # p = pykalman.KalmanFilter()
-    # p.em()
-
-    losses = kf.em(10,obs.mT,360,25,1,state.mT)
-    print(10*torch.log10(loss_fn(kf.Smoothed_State_Means.squeeze(),state.mT)).item())
-    plt.plot(losses)
-    plt.show()
-
-
+    def UpdateSSModel(self,ssModel):
+        self.ssModel = ssModel

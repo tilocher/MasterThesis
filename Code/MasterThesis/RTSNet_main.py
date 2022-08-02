@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
 
     Logger = LocalLogger('RTSNet', BaseConfig=config) if not UseWandb else \
-        WandbLogger(name='RTSNet', BaseConfig=config)
+        WandbLogger(name='RTSNet',group= config['WandbGroup'], BaseConfig=config)
 
     config = Logger.GetConfig()
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     ##############################################################################################
     ##############################################################################################
 
-    ssModel.GenerateSequence(ssModel.Q, ssModel.R, ssModel.T)
+    ssModel.GenerateSequence(ssModel.T)
 
     sample = ssModel.x.T[:, 0]
 

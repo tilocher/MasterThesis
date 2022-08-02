@@ -106,19 +106,19 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         CenteredDataFileName = f'CenteredData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}_sets_{num_sets}.pt'
         NoisyDataFileName = f'NoisyData_snr_{SNR_dB}_shape_{shape}_samples_{num_samples}_sets_{num_sets}.pt'
 
-        # if CenteredDataFileName in os.listdir(folderName):
-        #     self.centerd_data = torch.load(folderName + CenteredDataFileName).to(self.dev)
-        #     center_flag = False
-        # else:
-        self.Center()
-        center_flag = True
+        if CenteredDataFileName in os.listdir(folderName):
+            self.centerd_data = torch.load(folderName + CenteredDataFileName).to(self.dev)
+            center_flag = False
+        else:
+            self.Center()
+            center_flag = True
 
-        # if NoisyDataFileName in os.listdir(folderName):
-        #     self.noisy_dataset = torch.load(folderName + NoisyDataFileName).to(self.dev)
-        #     noisy_flag = False
-        # else:
-        self.AddGaussianNoise(SNR_dB)
-        noisy_flag = True
+        if NoisyDataFileName in os.listdir(folderName):
+            self.noisy_dataset = torch.load(folderName + NoisyDataFileName).to(self.dev)
+            noisy_flag = False
+        else:
+            self.AddGaussianNoise(SNR_dB)
+            noisy_flag = True
 
         if plot_sample:
             self.PlotSample()
@@ -200,13 +200,18 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         :return: A tuple of noisy and clean samples
         """
 
-        if self.roll == 0:
+        if not 'segmented' in self.__dict__:
 
-            return self.noisy_dataset[item], self.centerd_data[item]
+            if self.roll == 0:
+
+                return self.noisy_dataset[item], self.centerd_data[item]
+
+            else:
+                shift = int(torch.randint(low=-self.roll, high=self.roll, size=(1,)))
+                return torch.roll(self.noisy_dataset[item],shift,dims=1), torch.roll(self.centerd_data[item],shift,dims=1)
 
         else:
-            shift = int(torch.randint(low=-self.roll, high=self.roll, size=(1,)))
-            return torch.roll(self.noisy_dataset[item],shift,dims=1), torch.roll(self.centerd_data[item],shift,dims=1)
+            return self._GetSegmented(item)
 
 
     def __len__(self) -> int:
@@ -284,6 +289,40 @@ class PhyioNetLoader_MIT_NIH(Dataset):
             shift_state[t] = torch.roll(self.centerd_data[t], shift)
 
         return shift_obs, shift_state
+
+    def SplitToSegments(self):
+
+        self.segments = 0,160,200,self.fs
+
+        self.SegmentedData = []
+        self.SegmentedObservations = []
+
+
+        for segment_start,segment_end in zip(self.segments[:-1],self.segments[1:]):
+            self.SegmentedData.append(self.centerd_data[:,:,segment_start:segment_end])
+            self.SegmentedObservations.append(self.noisy_dataset[:,:,segment_start:segment_end])
+
+
+        self.segmented = True
+
+    def _GetSegmented(self,key):
+
+        states = [segment[key] for segment in self.SegmentedData]
+
+        noise = [segment[key] for segment in self.SegmentedObservations]
+
+        return noise,states
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':

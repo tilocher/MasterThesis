@@ -19,8 +19,8 @@ if __name__ == '__main__':
     UseWandb = config['wandb']
 
 
-    Logger = LocalLogger('AutoEncoder_SNR_sweep_roll', BaseConfig= config) if not UseWandb else\
-                    WandbLogger(name= 'AutoEncoder_SNR_sweep_roll',group='AutoEncoder_SNR_sweep_roll', BaseConfig= config)
+    Logger = LocalLogger(config['LoggerName'], BaseConfig= config) if not UseWandb else\
+                    WandbLogger(name= config['LoggerName'],group=config['wandbGroup'], BaseConfig= config)
 
     config = Logger.GetConfig()
 
@@ -32,10 +32,15 @@ if __name__ == '__main__':
 
     roll = config['roll']
 
+    Segmented = config['Segmented']
+
     loader = PhyioNetLoader_MIT_NIH(num_sets= 4, num_beats= 1,
                                     num_samples= signal_length, SNR_dB= snr, gpu= gpu,
                                     desired_shape= (1, signal_length, 2), roll= roll)
 
+
+    if Segmented:
+        loader.SplitToSegments()
 
     N_train = int(0.8 * len(loader))
     # N_train = 100
@@ -66,7 +71,7 @@ if __name__ == '__main__':
                           conv_dilation=((1, 1), (1, 1), (1, 1), (1, 1), (1, 1), (1, 1)),
                           latent_space_dim=LATENT_SPACE)
 
-    ECG_Pipeline = ECG_AE_Pipeline(Logger= Logger)
+    ECG_Pipeline = ECG_AE_Pipeline(logger= Logger, Segmented= Segmented)
     ECG_Pipeline.setModel(nnModel)
     ECG_Pipeline.setTrainingParams(weightDecay=config['L2'], n_Epochs=config['Epochs'], n_Batch=config['BatchSize'],
                                    learningRate=config['lr'], shuffle=True, split_ratio=0.7)

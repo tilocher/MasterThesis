@@ -1,0 +1,25 @@
+# Data Parameters:
+snr: 0 # in [dB]
+signal_length: 360 # Timesteps in an ecg signal
+
+# Computation and logging parameters
+gpu: False # Whether we want to try to use a gpu or not
+wandb: False
+wandbGroup: 'EM_Algorithm'
+
+# EM parameters
+EM_Its: 1
+
+# How to run the algorithm can be one of:
+# 'All', 'Segmented', 'Consecutive'
+Mode: 'Segmented'
+
+# How EM fits the data, can be one of:
+# 'Taylor', 'Prior', 'Identity'
+Fit: 'Taylor'
+
+# Taylor Model parameters
+Window: 'rectangular'
+WindowSize: 7
+WindowParameter: 0.7
+TaylorOrder: 5
