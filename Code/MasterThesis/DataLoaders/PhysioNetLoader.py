@@ -53,6 +53,10 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
     def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = False,
                  gpu = True, plot_sample = False, desired_shape = None, roll = 0):
+
+        if not 'MIT-BIH_Arrhythmia_Database' in os.listdir(os.getcwd()+'/'+os.path.relpath(os.path.dirname(__file__)+'/../Datasets/PhysioNet',os.getcwd())):
+            wfdb.io.dl_database('mitdb','Datasets/PhysioNet/MIT-BIH_Arrhythmia_Database/')
+
         super(PhyioNetLoader_MIT_NIH, self).__init__()
         self.snr_dB = None
         self.snr = None
@@ -292,7 +296,9 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
     def SplitToSegments(self):
 
-        self.segments = 0,160,200,self.fs
+        #self.segments = 0,90,144,200,260,self.fs
+        self.segments = 0,60,144,240,self.fs
+
 
         self.SegmentedData = []
         self.SegmentedObservations = []

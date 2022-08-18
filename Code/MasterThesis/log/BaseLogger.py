@@ -5,9 +5,11 @@ import os
 import shutil
 import yaml
 
+LOG_LOCATION = os.path.realpath(r"C:\Users\diloc\Desktop\Timur\Logs")
 
 class LocalLogger():
-    log_location = os.path.realpath(r"E:\MasterThesis\log")
+
+    log_location = LOG_LOCATION
 
     def __init__(self, name, BaseConfig={}):
 

@@ -56,12 +56,12 @@ if __name__ == '__main__':
         Fit = config['Fit']
         Mode = config['Mode']
 
-        EM_Pipe = EM_Taylor_Pipeline(taylor_model,Logger, em_parameters= ['mu','Sigma','R','Q'], Fit = Fit, Mode = Mode)
+        EM_Pipe = EM_Taylor_Pipeline(taylor_model,Logger, em_parameters= config['EM_vars'], Fit = Fit, Mode = Mode)
 
 
         EM_Pipe.TrainPrior(Train_Loader)
 
-        EM_Pipe.TestEM(Test_Loader, em_its=config['EM_Its'])
+        EM_Pipe.TestEM(Test_Loader, em_its=config['EM_Its'],ConvergenceThreshold=config['ConvergenceThreshold'])
 
     except:
         Logger.ForceClose()

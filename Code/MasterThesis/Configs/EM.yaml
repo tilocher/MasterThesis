@@ -8,7 +8,9 @@ wandb: False
 wandbGroup: 'EM_Algorithm'
 
 # EM parameters
-EM_Its: 1
+EM_Its: 50
+EM_vars: [Mu,Sigma,Q,R]
+ConvergenceThreshold: 1.0e-5
 
 # How to run the algorithm can be one of:
 # 'All', 'Segmented', 'Consecutive'

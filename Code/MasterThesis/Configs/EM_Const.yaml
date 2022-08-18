@@ -1,9 +1,23 @@
-# General Parameters
-snr: 6 # in [dB]
+Order: 2
+
+# Data Parameters:
+snr: 0 # in [dB]
 signal_length: 360 # Timesteps in an ecg signal
+
+# Computation and logging parameters
 gpu: False # Whether we want to try to use a gpu or not
 wandb: False
-EM_Its: 50
-Note: 'Only prior'
+wandbGroup: 'EM_Algorithm'
 
-Order: 4
+# EM parameters
+EM_Its: 50
+EM_vars: [Mu,Sigma,Q,R]
+ConvergenceThreshold: 1.0e-5
+
+# How to run the algorithm can be one of:
+# 'All', 'Segmented', 'Consecutive'
+Mode: 'All'
+
+# How EM fits the data, can be one of:
+# 'Taylor', 'Prior', 'Identity','None'
+Fit: 'None'

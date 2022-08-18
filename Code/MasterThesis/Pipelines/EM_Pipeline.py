@@ -18,11 +18,11 @@ from DataLoaders.PhysioNetLoader import PhyioNetLoader_MIT_NIH
 
 
 
-class EM_Taylor_Pipeline(nn.Module):
+class EM_Pipeline(nn.Module):
 
     def __init__(self,PriorModel, Logger: LocalLogger, em_parameters = ['R','Q', 'Mu','Sigma'], Fit = 'Taylor',
                  Mode = 'All'):
-        super(EM_Taylor_Pipeline, self).__init__()
+        super(EM_Pipeline, self).__init__()
         self.Logs = {'EM_Iter_Loss':'.npy',
                 'EM_Sample_Plot': '.pdf',
                 'EM_Convergence':'.pdf',
@@ -34,18 +34,8 @@ class EM_Taylor_Pipeline(nn.Module):
 
         self.Logger.AddLocalLogs(self.Logs)
 
-
-
         self.PriorModel  = PriorModel
 
-        self.HyperParams = {'Window':PriorModel.window,
-                            'WindowSize': PriorModel.window_size,
-                            'WindowParameter': PriorModel.window_parameters,
-                            'TaylorOrder': PriorModel.taylor_order
-
-        }
-
-        self.Logger.SaveConfig(self.HyperParams)
 
         self.wandb = isinstance(Logger, WandbLogger)
 
@@ -141,17 +131,17 @@ class EM_Taylor_Pipeline(nn.Module):
         plt.show()
 
 
-    def TestEM(self, TestSet: PhyioNetLoader_MIT_NIH, em_its = 10, Num_Plot_Samples = 10):
+    def TestEM(self, TestSet: PhyioNetLoader_MIT_NIH, em_its = 10, Num_Plot_Samples = 10, ConvergenceThreshold = 1e-5):
 
         if self.Fit == 'Prior':
             em_its = 1
 
         if self.Mode == 'All':
-            self.EM(TestSet = TestSet, em_its= em_its, Num_Plot_Samples= Num_Plot_Samples)
+            self.EM(TestSet = TestSet, em_its= em_its, Num_Plot_Samples= Num_Plot_Samples,ConvergenceThreshold= ConvergenceThreshold)
         elif self.Mode == 'Segmented':
-            self.SegmentedEM(TestSet = TestSet, em_its= em_its, Num_Plot_Samples= Num_Plot_Samples)
+            self.SegmentedEM(TestSet = TestSet, em_its= em_its, Num_Plot_Samples= Num_Plot_Samples,ConvergenceThreshold= ConvergenceThreshold)
         elif self.Mode == 'Consecutive':
-            self.ConsecutiveEM(TestSet = TestSet, em_its= em_its, Num_Plot_Samples= Num_Plot_Samples)
+            self.ConsecutiveEM(TestSet = TestSet, em_its= em_its, Num_Plot_Samples= Num_Plot_Samples,ConvergenceThreshold= ConvergenceThreshold)
 
         else:
             raise ValueError(f'Mode {self.Mode} not supported')
@@ -161,7 +151,7 @@ class EM_Taylor_Pipeline(nn.Module):
 
 
 
-    def EM(self, TestSet, em_its = 10, Num_Plot_Samples = 10):
+    def EM(self, TestSet, em_its = 10, Num_Plot_Samples = 10,ConvergenceThreshold= 1e-5):
 
         self.TestSet = TestSet
 
@@ -192,15 +182,9 @@ class EM_Taylor_Pipeline(nn.Module):
         if self.Fit == 'Prior':
             self.KalmanSmoother.InitMean(Test_Targets[:, 0, 0].unsqueeze(-1))
 
-        # init_state = torch.zeros_like(Test_Inputs)
-        # init_state = init_state[...,:(self.ssModel.m-2)]
-        # init_state = torch.concat((Test_Targets, init_state), -1)
-        # self.KalmanSmoother.InitMean(init_state.unsqueeze(-1))
-
-
-
         self.EM_losses = self.KalmanSmoother.em(num_itts= em_its, Observations= Test_Inputs.squeeze(), T = self.ssModel.T,
-                               q_2= Initial_q_2, r_2= Initial_r_2, states= Test_Targets.squeeze())
+                               q_2= Initial_q_2, r_2= Initial_r_2, states= Test_Targets.squeeze()
+                                                ,ConvergenceThreshold= ConvergenceThreshold)
 
         np.save(self.Logger.GetLocalSaveName('EM_Iter_Loss'),self.EM_losses.numpy())
         np.save(self.Logger.GetLocalSaveName('KGain'), self.KalmanSmoother.Kalman_Gains.numpy())
@@ -297,7 +281,7 @@ class EM_Taylor_Pipeline(nn.Module):
                 plt.show()
 
 
-    def SegmentedEM(self,TestSet: PhyioNetLoader_MIT_NIH, em_its: int  = 10, Num_Plot_Samples: int = 10):
+    def SegmentedEM(self,TestSet: PhyioNetLoader_MIT_NIH, em_its: int  = 10, Num_Plot_Samples: int = 10,ConvergenceThreshold= 1e-5):
         """
         Function to Test EM on Segmented heartbeats
         :params:
@@ -367,7 +351,8 @@ class EM_Taylor_Pipeline(nn.Module):
             # Run EM
             self.EM_losses = self.KalmanSmoother.em(num_itts=em_its, Observations=SegmentInput.squeeze(),
                                                     T=self.ssModel.T,
-                                                    q_2=Initial_q_2, r_2=Initial_r_2, states=SegmentTarget.squeeze())
+                                                    q_2=Initial_q_2, r_2=Initial_r_2, states=SegmentTarget.squeeze(),
+                                                    ConvergenceThreshold=ConvergenceThreshold)
 
             # Save results
             np.save(self.Logger.GetLocalSaveName('EM_Iter_Loss',prefix=f'Segment_{j}_'), self.EM_losses.numpy())
@@ -400,7 +385,7 @@ class EM_Taylor_Pipeline(nn.Module):
 
         self.save()
 
-    def ConsecutiveEM(self,TestSet: PhyioNetLoader_MIT_NIH, em_its: int  = 10, Num_Plot_Samples: int = 10):
+    def ConsecutiveEM(self,TestSet: PhyioNetLoader_MIT_NIH, em_its: int  = 10, Num_Plot_Samples: int = 10, ConvergenceThreshold= 1e-5):
         """
         Function to Test EM on consecutive heartbeats
         :params:
@@ -430,7 +415,7 @@ class EM_Taylor_Pipeline(nn.Module):
         FirstHB_obs, FirstHB_state = next(iter(TestDataset))
         self.KalmanSmoother.InitSequence(FirstHB_obs[:,0,0].unsqueeze(-1))
         self.EM_losses = self.KalmanSmoother.em(num_itts=1, Observations=FirstHB_obs.squeeze(), states= FirstHB_state.squeeze(),
-                               q_2=Initial_q_2, r_2= Initial_r_2, T = self.ssModel.T)
+                               q_2=Initial_q_2, r_2= Initial_r_2, T = self.ssModel.T, ConvergenceThreshold=ConvergenceThreshold)
 
         for Observation, State in TestDataset:
             self.ssModel.InitSequence(torch.zeros((self.ssModel.m, 1)), torch.eye(self.ssModel.m))
@@ -443,7 +428,22 @@ class EM_Taylor_Pipeline(nn.Module):
         self.ssModel.InitSequence(torch.zeros((self.ssModel.m,1)), torch.eye(self.ssModel.m))
         self.PlotPrior()
 
+# Additional specific pipelines
+class EM_Taylor_Pipeline(EM_Pipeline):
 
+    def __init__(self,PriorModel, Logger: LocalLogger, em_parameters = ['R','Q', 'Mu','Sigma'], Fit = 'Taylor',
+                 Mode = 'All'):
+
+        super(EM_Taylor_Pipeline, self).__init__(PriorModel,Logger,em_parameters,Fit,Mode)
+
+        self.HyperParams = {'Window': PriorModel.window,
+                            'WindowSize': PriorModel.window_size,
+                            'WindowParameter': PriorModel.window_parameters,
+                            'TaylorOrder': PriorModel.taylor_order
+
+                            }
+
+        self.Logger.SaveConfig(self.HyperParams)
 
 
 

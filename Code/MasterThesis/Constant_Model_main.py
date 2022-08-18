@@ -5,7 +5,7 @@ import yaml
 from yaml.loader import SafeLoader
 from log.BaseLogger import WandbLogger,LocalLogger
 
-from Pipelines.EM_Pipeline import EM_Taylor_Pipeline
+from Pipelines.EM_Pipeline import EM_Pipeline
 from SystemModels.ConstantModels import ConstantModel
 import numpy as np
 
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     Cmodel = ConstantModel(config['Order'], 0,1, 1, 360, deltaT = 1)#1/loader.fs)# 7e-3)#1/1000)
 
 
-    EM_Pipe = EM_Taylor_Pipeline(Cmodel,Logger, em_parameters= ['mu','Sigma','R','Q'])
+    EM_Pipe = EM_Pipeline(Cmodel,Logger, em_parameters= ['mu','Sigma','R','Q'])
 
     EM_Pipe.TrainPrior(Train_Loader)
 

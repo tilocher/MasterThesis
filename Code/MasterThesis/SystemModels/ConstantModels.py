@@ -68,7 +68,7 @@ class ConstantModel():
         self.ssModel.setHJac(lambda x,y: self.H)
         self.ssModel.UpdateCovariance_Matrix(self.Q,self.R)
 
-    def GetSysModel(self,T):
+    def GetSysModel(self,T,timesteps = None):
         return self.ssModel
 
     def fit(self,x):

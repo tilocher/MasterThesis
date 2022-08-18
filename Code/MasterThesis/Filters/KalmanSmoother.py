@@ -303,7 +303,8 @@ class KalmanSmoother(KalmanFilter):
 
             self.Pariwise_Covariances[:,t] = torch.bmm(self.Smoothed_State_Covariance, self.SG.mT)
 
-    def em(self, Observations: torch.Tensor,T: int, q_2: float,r_2: float,num_itts:int = 20, states:torch.Tensor = None):
+    def em(self, Observations: torch.Tensor,T: int, q_2: float,r_2: float,num_itts:int = 20, states:torch.Tensor = None,
+           ConvergenceThreshold = 1e-5):
 
         with torch.no_grad():
 
@@ -314,7 +315,7 @@ class KalmanSmoother(KalmanFilter):
             IterationCounter = trange(num_itts, desc = 'EM optimization steps')
 
             if states != None:
-                losses = torch.empty(num_itts)
+                losses = []
                 loss_fn = torch.nn.MSELoss(reduction='mean')
 
             for n in IterationCounter:
@@ -337,46 +338,47 @@ class KalmanSmoother(KalmanFilter):
 
                 self.V_x1x1 = self.U_xx[:,1:]
 
-                if 'H' in self.em_vars:
-                    self.EM_Update_H()
-
-                if 'R' in self.em_vars:
-                    self.EM_Update_R()
-
-                if 'F' in self.em_vars:
-                    self.EM_Update_F()
-
-                if 'Q' in self.em_vars:
-                    self.EM_Update_Q()
-
-                if 'Mu' in self.em_vars:
-                    self.EM_Update_MU()
-
-                if 'Sigma' in self.em_vars:
-                    self.EM_Update_Sigma()
+                for EmVar in self.em_vars:
+                    self.__getattribute__(f'EM_Update_{EmVar}')()
 
                 self.Average_EM_vars()
 
                 if states != None:
 
                     loss = loss_fn(self.Smoothed_State_Means.squeeze(), states.squeeze())
-                    losses[n] = 10*torch.log10(loss)
+                    losses.append(10*torch.log10(loss))
                     IterationCounter.set_description('Iteration loss: {} [dB]'.format(10*torch.log10(loss).item()))
 
+                if all([self.__getattribute__(f'{i}_diff') < ConvergenceThreshold for i in self.em_vars]):
+                    print('Converged')
+                    break
+
+
+
             if states != None:
-                return losses
+                return torch.tensor(losses)
 
 
     def EM_Update_H(self):
 
+        H_arr = torch.einsum('Bmp,Bpn->Bmn',(self.U_yx.mean(1),torch.linalg.pinv(self.U_xx.mean(1))))
+
+        try:
+            self.H_diff = torch.abs(torch.mean(H_arr-self.H_arr))
+        except TypeError:
+            self.H_diff = torch.inf
+
         self.H_arr = torch.einsum('Bmp,Bpn->Bmn',(self.U_yx.mean(1),torch.linalg.pinv(self.U_xx.mean(1))))
 
-    def EM_Update_MU(self):
+    def EM_Update_Mu(self):
+
+        self.Mu_diff = torch.abs(torch.mean(self.Initial_State_Mean - self.Smoothed_State_Means[:,0]))
 
         self.InitMean(self.Smoothed_State_Means[:,0])
 
     def EM_Update_Sigma(self):
 
+        self.Sigma_diff = torch.abs(torch.mean(self.Initial_State_Covariance - self.Smoothed_State_Covariances[:,0]))
         self.InitCovariance(self.Smoothed_State_Covariances[:,0])
 
 
@@ -386,12 +388,24 @@ class KalmanSmoother(KalmanFilter):
 
         R_arr = self.U_yy - HU_xy - HU_xy.mT + torch.einsum('Bmp,BTpk,Bkn->BTmn',(self.H_arr,self.U_xx,self.H_arr.mT))
 
+        try:
+            self.R_diff = torch.abs(torch.mean(R_arr.mean(1) - self.R_arr))
+        except TypeError:
+            self.R_diff = torch.inf
+
         self.R_arr = 0.5 * R_arr + 0.5 * R_arr.mT
 
 
     def EM_Update_F(self):
 
-        self.F_arr = torch.einsum('Bmp,Bpn->Bmn',(self.V_x1x.mean(1), torch.linalg.pinv(self.V_xx.mean(1))))
+        F_arr = torch.einsum('Bmp,Bpn->Bmn',(self.V_x1x.mean(1), torch.linalg.pinv(self.V_xx.mean(1))))
+
+        try:
+            self.F_diff = torch.abs(torch.mean(F_arr - self.F_arr))
+        except TypeError:
+            self.F_diff = torch.inf
+
+        self.F_arr = F_arr
 
     def EM_Update_Q(self):
 
@@ -400,6 +414,11 @@ class KalmanSmoother(KalmanFilter):
         Q_arr = self.V_x1x1 - FV_xx1 - FV_xx1.mT +\
                      torch.einsum('Bmp,BTpk,Bkn->BTmn',(self.F_arr,self.V_xx,self.F_arr.mT))
         Q_arr = torch.cat((Q_arr,Q_arr[:,0].unsqueeze(1)),dim = 1)
+
+        try:
+            self.Q_diff = torch.abs(torch.mean(Q_arr - self.Q_arr))
+        except TypeError:
+            self.Q_diff = torch.inf
 
         self.Q_arr = 0.5 * Q_arr + 0.5 * Q_arr.mT
 

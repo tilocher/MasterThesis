@@ -387,7 +387,7 @@ class Pipeline():
 
                 self.MSE_test_linear_arr = torch.mean(test_loss,dim=[n for n in range(1,test_loss.ndim)])
 
-                self.PlotResults(test_input,test_target,Inference_out)
+                self.PlotResults(test_input,test_target,Inference_out,**kwargs)
 
 
             self.MSE_test_linear_avg = self.MSE_test_linear_arr.mean()
@@ -401,7 +401,7 @@ class Pipeline():
 
         self.save()
 
-    def PlotResults(self,test_input,test_target,predictions):
+    def PlotResults(self,test_input,test_target,predictions,**kwargs):
         pass
 
     def InitTraining(self,Batch_size,**kwargs):
