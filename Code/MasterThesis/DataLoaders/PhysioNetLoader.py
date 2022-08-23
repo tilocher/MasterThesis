@@ -52,7 +52,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
     '''
 
     def __init__(self, num_sets: int, num_beats: int, num_samples: int, SNR_dB: float, random_sample = False,
-                 gpu = True, plot_sample = False, desired_shape = None, roll = 0):
+                 gpu = True, plot_sample = False, desired_shape = None, roll = 0, channels = 2):
 
         if not 'MIT-BIH_Arrhythmia_Database' in os.listdir(os.getcwd()+'/'+os.path.relpath(os.path.dirname(__file__)+'/../Datasets/PhysioNet',os.getcwd())):
             wfdb.io.dl_database('mitdb','Datasets/PhysioNet/MIT-BIH_Arrhythmia_Database/')
@@ -78,6 +78,10 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() and gpu else 'cpu')
 
+        self.m = self.n = channels
+
+        self.channels = channels
+
         folderName = self.file_location + '/../Datasets/PhysioNet/MIT-BIH_Arrhythmia_Database/'
 
 
@@ -94,7 +98,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         self.files = [wfdb.rdrecord(header_file[:-4]) for header_file in sample_header]
         self.annotation = [wfdb.rdann(annotation_file[:-4], 'atr' ) for annotation_file in sample_annotation]
 
-        self.fs = self.files[0].fs
+        self.fs = self.T =  self.files[0].fs
         self.num_channels = self.files[0].n_sig
 
         self.dataset = torch.tensor(np.array([file.p_signal for file in self.files]),dtype= torch.float32,device=
@@ -208,7 +212,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
 
             if self.roll == 0:
 
-                return self.noisy_dataset[item], self.centerd_data[item]
+                return self.noisy_dataset[item,...,:self.channels], self.centerd_data[item,...,:self.channels]
 
             else:
                 shift = int(torch.randint(low=-self.roll, high=self.roll, size=(1,)))

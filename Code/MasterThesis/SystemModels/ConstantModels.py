@@ -53,26 +53,30 @@ class ConstantModel():
         self.Q = q_2 * self.base_Q
         self.R = r_2 * torch.eye(self.observation_order)
 
-        def f(x,t):
-            return (self.F @ x).squeeze()
-        def h(x,t):
 
-            if len(x.shape) != 2:
-                return (self.H @ x).squeeze()
-            else:
-                H = self.H.unsqueeze(0).repeat(self.T,1,1)
-                return (torch.bmm(H,x.unsqueeze(-1))).squeeze(-1)
 
-        self.ssModel = SystemModel(f,np.sqrt(q_2),h, np.sqrt(r_2), T,T,state_order,self.observation_order)
-        self.ssModel.setFJac(lambda x,t: self.F)
-        self.ssModel.setHJac(lambda x,y: self.H)
+        self.ssModel = SystemModel(self.f,np.sqrt(q_2),self.h, np.sqrt(r_2), T,T,state_order,self.observation_order)
+        self.ssModel.setFJac(self.df)
+        self.ssModel.setHJac(self.dh)
         self.ssModel.UpdateCovariance_Matrix(self.Q,self.R)
 
+    def f(self,x, t):
+        return (self.F @ x)
+
+    def h(self,x, t):
+        return self.H @ x
+
+    def df(self,x,t):
+        return self.F
+
+    def dh(self,x,t):
+        return self.H
     def GetSysModel(self,T,timesteps = None):
         return self.ssModel
 
     def fit(self,x):
-        pass
+        return self.GetSysModel(None)
+
 
     def UpdateGain(self,q_2,r_2):
 

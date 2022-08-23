@@ -146,6 +146,7 @@ class Taylor_model():
         batch_size, channels, time_steps = data.shape
 
         self.time_steps = time_steps
+        self.channels = channels
 
         # basis_functions = self.n_prediction_weight.reshape(-1,1).float() @ self.basis_functions.T
         # basis_functions = basis_functions.repeat((batch_size,1,1))
@@ -251,7 +252,7 @@ class Taylor_model():
     def HJacobian(self,x, t):
         return torch.eye(self.channels)
 
-    def GetSysModel(self,channels,timesteps = None, offset = 0, gpu = False):
+    def GetSysModel(self,timesteps = None, offset = 0, gpu = False):
 
 
         self.offset = offset
@@ -261,15 +262,15 @@ class Taylor_model():
 
         if gpu:
             dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-            self.ssModel = SystemModel(self.f, 0, self.h, 0, timesteps, timesteps, channels,
-                                       channels)
+            self.ssModel = SystemModel(self.f, 0, self.h, 0, timesteps, timesteps, self.channels,
+                                       self.channels)
 
             self.basis_functions = self.basis_functions.to(dev)
             self.ssModel.setFJac(self.FJacobian)
             self.ssModel.setHJac(self.HJacobian)
 
 
-        self.ssModel = SystemModel(self.f, 0, self.h, 0,timesteps, timesteps,channels,channels)
+        self.ssModel = SystemModel(self.f, 0, self.h, 0,timesteps, timesteps,self.channels,self.channels)
         self.ssModel.setFJac(self.FJacobian)
         self.ssModel.setHJac(self.HJacobian)
 

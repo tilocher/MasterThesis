@@ -36,7 +36,6 @@ class EM_Pipeline(nn.Module):
 
         self.PriorModel  = PriorModel
 
-
         self.wandb = isinstance(Logger, WandbLogger)
 
         self.em_parameters = em_parameters
@@ -51,50 +50,6 @@ class EM_Pipeline(nn.Module):
         torch.save(self, self.Logger.GetLocalSaveName('Pipelines'))
 
 
-
-
-    def TrainPrior(self,TrainLoader):
-
-        try:
-            self._TrainPrior(TrainLoader)
-            self.PlotPrior()
-
-        except:
-            self.Logger.ForceClose()
-            raise
-
-    def _TrainPrior(self,TrainLoader):
-
-        DataSet_length = len(TrainLoader)
-
-        self.Logger.SaveConfig({'TrainSamples': DataSet_length})
-
-        TrainDataset = DataLoader(TrainLoader, shuffle=False, batch_size=DataSet_length)
-
-        train_inputs,_ = next(iter(TrainDataset))
-
-        if not self.Fit == 'Identity':
-
-            self.PriorModel.fit(train_inputs.squeeze().mT)
-
-        else:
-
-            self.PriorModel.f = self.PriorModel.Identity
-
-
-        self.ssModel = self.PriorModel.GetSysModel(train_inputs.shape[-1], timesteps= train_inputs.shape[-2])
-
-        self.ssModel.InitSequence(torch.zeros((self.ssModel.m,1)), torch.eye(self.ssModel.m))
-
-
-
-        self.KalmanSmoother = KalmanSmoother(ssModel= self.ssModel, em_vars= self.em_parameters)
-        self.KalmanSmoother.InitSequence()
-
-        if self.Fit == 'Prior':
-            self.KalmanSmoother.SetOnlyPrior()
-
-        self.PlotPrior()
 
     def PlotPrior(self,prefix = ''):
 
@@ -444,6 +399,46 @@ class EM_Taylor_Pipeline(EM_Pipeline):
                             }
 
         self.Logger.SaveConfig(self.HyperParams)
+
+    def TrainPrior(self, TrainLoader):
+
+        try:
+            self._TrainPrior(TrainLoader)
+            self.PlotPrior()
+
+        except:
+            self.Logger.ForceClose()
+            raise
+
+    def _TrainPrior(self, TrainLoader):
+
+        DataSet_length = len(TrainLoader)
+
+        self.Logger.SaveConfig({'TrainSamples': DataSet_length})
+
+        TrainDataset = DataLoader(TrainLoader, shuffle=False, batch_size=DataSet_length)
+
+        train_inputs, _ = next(iter(TrainDataset))
+
+        if not self.Fit == 'Identity':
+
+            self.PriorModel.fit(train_inputs.squeeze().mT)
+
+        else:
+
+            self.PriorModel.f = self.PriorModel.Identity
+
+        self.ssModel = self.PriorModel.GetSysModel(train_inputs.shape[-1], timesteps=train_inputs.shape[-2])
+
+        self.ssModel.InitSequence(torch.zeros((self.ssModel.m, 1)), torch.eye(self.ssModel.m))
+
+        self.KalmanSmoother = KalmanSmoother(ssModel=self.ssModel, em_vars=self.em_parameters)
+        self.KalmanSmoother.InitSequence()
+
+        if self.Fit == 'Prior':
+            self.KalmanSmoother.SetOnlyPrior()
+
+        self.PlotPrior()
 
 
 

@@ -10,7 +10,7 @@ wandb: False
 wandbGroup: 'EM_Algorithm'
 
 # EM parameters
-EM_Its: 50
+EM_Its: 100
 EM_vars: [Mu,Sigma,Q,R]
 ConvergenceThreshold: 1.0e-5
 

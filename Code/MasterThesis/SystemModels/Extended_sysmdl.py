@@ -143,7 +143,7 @@ class SystemModel:
                 xt = self.f(self.x_prev,t)
                 mean = torch.zeros([self.m])
                 
-                eq = torch.distributions.MultivariateNormal(loc= mean.reshape(1,-1), covariance_matrix=self.Q).sample().squeeze()
+                eq = torch.distributions.MultivariateNormal(loc= mean.reshape(1,-1), covariance_matrix=self.Q).sample().reshape(self.m,1)
                          
                 # Additive Process Noise
                 xt = torch.add(xt,eq)
@@ -205,7 +205,7 @@ class SystemModel:
                     initConditions = torch.zeros_like(self.m1x_0)
 
             self.InitSequence(initConditions, self.m2x_0)
-            self.GenerateSequence(self.Q, self.R, T)
+            self.GenerateSequence(T)
 
             # Training sequence input
             self.Input[i, :, :] = self.y

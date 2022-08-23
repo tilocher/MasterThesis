@@ -6,14 +6,10 @@ from DataLoaders.PhysioNetLoader import PhyioNetLoader_MIT_NIH
 import yaml
 from yaml.loader import SafeLoader
 from log.BaseLogger import WandbLogger,LocalLogger
-from NNs.AutoEncoder import AutoEncoder
-from Pipelines.AutoEncoder_Pipeline import ECG_AE_Pipeline
-import os
-import wandb
-import copy
-from Pipelines.EM_Pipeline import EM_Taylor_Pipeline
+
 from SystemModels.Taylor_model import Taylor_model
 import numpy as np
+from Pipelines.EM_Pipelines import *
 
 if __name__ == '__main__':
 
@@ -37,16 +33,6 @@ if __name__ == '__main__':
                                         plot_sample=False, desired_shape=(1, signal_length, 2), roll=0)
 
 
-        N_train = int(0.8 * len(loader))
-        N_test = len(loader) - N_train
-
-        dev = torch.device('cpu')
-        torch.random.manual_seed(42)
-
-        Train_Loader, Test_Loader = torch.utils.data.random_split(loader, [N_train, N_test],
-                                                                  generator=torch.Generator())
-
-        Test_Loader.indices = Test_Loader.indices[:500]
 
 
 
@@ -56,12 +42,9 @@ if __name__ == '__main__':
         Fit = config['Fit']
         Mode = config['Mode']
 
-        EM_Pipe = EM_Taylor_Pipeline(taylor_model,Logger, em_parameters= config['EM_vars'], Fit = Fit, Mode = Mode)
+        EM_Pipe = eval('TaylorModel_Pipeline(taylor_model,Logger, em_parameters= config["EM_vars"], Mode = Mode)'.format(Fit))
 
-
-        EM_Pipe.TrainPrior(Train_Loader)
-
-        EM_Pipe.TestEM(Test_Loader, em_its=config['EM_Its'],ConvergenceThreshold=config['ConvergenceThreshold'])
+        EM_Pipe.Run(loader, em_its=config['EM_Its'],PriorSamples=config['PriorSamples'],ConvergenceThreshold=config['ConvergenceThreshold'])
 
     except:
         Logger.ForceClose()

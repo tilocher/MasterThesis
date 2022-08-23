@@ -14,11 +14,12 @@ ConvergenceThreshold: 1.0e-5
 
 # How to run the algorithm can be one of:
 # 'All', 'Segmented', 'Consecutive'
-Mode: 'Segmented'
+Mode: 'All'
 
 # How EM fits the data, can be one of:
 # 'Taylor', 'Prior', 'Identity'
 Fit: 'Taylor'
+PriorSamples: 1816
 
 # Taylor Model parameters
 Window: 'rectangular'
