@@ -4,6 +4,7 @@
 import glob
 # Load libraries
 import numpy as np
+import scipy.signal
 import wfdb
 import mne
 import torch
@@ -12,18 +13,79 @@ import matplotlib.pyplot as plt
 from torch.utils.data.dataloader import DataLoader, Dataset
 import os
 
+from scipy.signal import butter,filtfilt
+from scipy.fft import fft, fftfreq
+from Filters.QRSDetectorOffline import QRSDetectorOffline
+
 
 class PhyioNetLoader_AbdominalAndDirect(Dataset):
 
-    def __init__(self):
+    def __init__(self,sample, num_beats = 1, num_samples = 1000, num_sets = 1, desired_shape = None):
         super(PhyioNetLoader_AbdominalAndDirect, self).__init__()
+
+        self.num_beats = num_beats
+        self.sample = sample
+        self.num_samples = num_samples
+        self.fs = 1000
+        self.num_channels = 4
+        self.num_sets = num_sets
+
 
         self.file_location = os.path.dirname(os.path.realpath(__file__))
 
         edf_files = glob.glob(self.file_location+'/../Datasets/PhysioNet/abdominal-and-direct-fetal/*.edf')
         self.files = [mne.io.read_raw_edf(edf_file) for edf_file in edf_files]
 
-        self.dataset = torch.tensor(np.array([file.get_data() for file in self.files]), dtype=torch.float32).mT
+        self.Full_dataset = torch.tensor(np.array([file.get_data() for file in self.files]), dtype=torch.float32).mT
+
+        self.dataset_unfiltered = self.Full_dataset[:self.num_sets]
+        self.SampleDataset = self.files[:self.num_sets]
+
+        self.dataset_filtered = torch.empty(self.dataset_unfiltered.shape)
+
+
+
+
+        for i in range(4):
+            y = self.dataset_unfiltered[0,:,i+1]
+
+            y = y.reshape(-1, 1)
+            non_sense = np.zeros_like(y)
+            signal = np.concatenate((non_sense,y), axis= -1)
+
+            qrs_detector = QRSDetectorOffline(signal,False,False,False,False)
+
+            if i == 0:
+                self.labels = scipy.signal.find_peaks(qrs_detector.squared_ecg_measurements,height=0.5e-11, distance=500)[:1]
+
+            self.dataset_filtered[0,:,i+1] = torch.from_numpy(qrs_detector.filtered_ecg_measurements)
+
+        self.dataset = self.dataset_filtered[:,:,1:]
+        self.Center()
+
+        if desired_shape != None:
+            intermediate = self.centerd_data
+
+            while len(desired_shape) + 1 != len(intermediate.shape):
+                intermediate = intermediate.unsqueeze(-1)
+
+            permutation = [intermediate.shape[1:].index(x) + 1 for x in desired_shape]
+
+            permutation = [0] + permutation
+
+            self.centerd_data = intermediate.permute(permutation)
+
+
+
+    def __len__(self):
+        # return self.centerd_data.shape[0]
+        return 31
+
+
+    def __getitem__(self,item):
+        return self.centerd_data[item]
+
+
         # self.labels = torch.tensor(np.array([file.sample for file in self.annotation]), dtype=torch.float32)[0, 1:]
 
         # test = mne.io.read_raw_edf(self.file_location+'/../Datasets/PhysioNet/abdominal-and-direct-fetal/ANNOTATORS.edf')
@@ -33,6 +95,56 @@ class PhyioNetLoader_AbdominalAndDirect(Dataset):
         # plt.plot(self.datasets[0].get_data()[0, :2000], label='gt')
         plt.legend()
         plt.show()
+
+
+    def Center(self):
+
+        full_data = []
+        for j,label in enumerate(self.labels):
+
+            beat_indices_last = label[self.num_beats-1::self.num_beats]
+            beat_indices_first = label[0::self.num_beats]
+            intermediate = []
+
+
+            last_index = 0
+            num_waveforms = 0
+
+            self.num_pad = []
+
+            for i, index in enumerate(beat_indices_last):
+
+                if self.num_beats == 1:
+                    middle = int(last_index + int((index - last_index)/1))
+                else:
+                    middle = int( last_index + (index - beat_indices_first[i]) / 2)
+
+                lower_index = middle - int(self.num_samples/2)
+                upper_index = middle + int(self.num_samples/2)
+
+                if lower_index >= 0 and upper_index < self.dataset.shape[-2]:
+
+                    if self.num_samples > self.fs*self.num_beats:
+                        num_pad = int((self.num_samples-self.fs)/2)
+                        self.num_pad.append([num_pad,num_pad])
+                        data = torch.nn.functional.pad(self.dataset[j,int(index)-int(self.fs/2):int(index) + int(self.fs/2),:], (num_pad,num_pad,0,0),'replicate')
+                        intermediate.append(data)
+
+                    else:
+                        intermediate.append(self.dataset[j,lower_index:upper_index,:])
+                    num_waveforms+=1
+                last_index = index
+
+            centered_data  = torch.stack(intermediate,dim=1)
+            permutation = [centered_data.shape.index(x) for x in (num_waveforms,self.num_channels,self.num_samples)]
+            centered_data  = centered_data.permute(permutation)
+
+            full_data.append(centered_data)
+
+        full_data = self.centerd_data =  torch.cat(full_data,dim=0)
+        return full_data
+
+
 
 
 class PhyioNetLoader_MIT_NIH(Dataset):
@@ -228,6 +340,7 @@ class PhyioNetLoader_MIT_NIH(Dataset):
         :return: Size of the dataset
         """
         return self.centerd_data.shape[0]
+        # return 110
 
     def AddGaussianNoise(self, SNR_dB: float) -> None:
         """

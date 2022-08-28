@@ -49,12 +49,12 @@ class KalmanFilter():
 
     def BMM(self, X, Y, XisDiag,YisDiag):
 
-        #XDiag = torch.diag_embed(torch.einsum('bii->bi',X))
-        #YDiag = torch.diag_embed(torch.einsum('bii->bi',Y))
-
-        #if torch.count_nonzero(X-XDiag) != 0 and XDiag:
+        # XDiag = torch.diag_embed(torch.einsum('bii->bi',X))
+        # YDiag = torch.diag_embed(torch.einsum('bii->bi',Y))
+        #
+        # if torch.count_nonzero(X-XDiag) != 0 and XDiag:
         #    print('WRONG X')
-        #if torch.count_nonzero(Y-YDiag) != 0 and YisDiag:
+        # if torch.count_nonzero(Y-YDiag) != 0 and YisDiag:
         #    print('WRONG Y')
 
         if XisDiag and YisDiag and X.shape[-1] == X.shape[-2] and Y.shape[-1] == Y.shape[-2]:
@@ -72,6 +72,8 @@ class KalmanFilter():
             return torch.diag_embed(torch.nan_to_num(1/torch.einsum('bii->bi',X), 0,0,0))
         else:
             return torch.linalg.pinv(X)
+
+
     def f_batch(self, state, t):
         return torch.stack([self.f(x, t) for x in state])
 
@@ -197,9 +199,7 @@ class KalmanFilter():
 
         with torch.no_grad():
 
-            # # Get a batch dimension if there is none
-            # observations = self.Observations = torch.atleast_3d(observations).unsqueeze(-1)
-
+            # Add a batch dimension if there is none
             if len(observations.shape) == 2:
                 observations = observations.unsqueeze(0)
             observations = self.Observations = observations.unsqueeze(-1)
@@ -251,6 +251,57 @@ class KalmanFilter():
 
             self.F_arr = self.F_arr.mean(1)
             self.H_arr = self.H_arr.mean(1)
+
+    def InitOnline(self,T):
+
+        self.BatchSize = 1
+
+        self.Filtered_State_Mean = self.Initial_State_Mean
+        self.Filtered_State_Covariance = self.Initial_State_Covariance
+
+        # Initialize sequences
+        self.Filtered_State_Means = torch.empty((self.BatchSize, T, self.m, 1))
+        self.Filtered_State_Covariances = torch.empty((self.BatchSize, T, self.m, self.m))
+        self.Kalman_Gains = torch.empty((self.BatchSize, T, self.m, self.n))
+        self.Predicted_State_Means = torch.empty((self.BatchSize, T, self.m, 1))
+        self.Predicted_State_Covariances = torch.empty((self.BatchSize, T, self.m, self.m))
+        self.Predicted_Observation_Means = torch.empty((self.BatchSize, T, self.n, 1))
+        self.Predicted_Observation_Covariances = torch.empty((self.BatchSize, T, self.n, self.n))
+        self.Filtered_Residuals = torch.empty((self.BatchSize, T, self.n, 1))
+
+        self.F_arr = torch.empty((self.BatchSize, T, self.m, self.m))
+        self.H_arr = torch.empty((self.BatchSize, T, self.n, self.m))
+
+        # Initialize time
+        self.t = 0
+
+    def UpdateOnline(self, observations):
+
+        self.predict(self.t)
+        self.KGain(self.t)
+        self.Innovation(observations)
+        self.Correct()
+
+        # Update Arrays
+        self.Filtered_State_Means[:, self.t] = self.Filtered_State_Mean
+        self.Filtered_State_Covariances[:, self.t] = self.Filtered_State_Covariance
+        self.Kalman_Gains[:, self.t] = self.KG
+        self.Predicted_State_Means[:, self.t] = self.Predicted_State_Mean
+        self.Predicted_State_Covariances[:, self.t] = self.Predicted_State_Covariance
+        self.Predicted_Observation_Means[:, self.t] = self.Predicted_Observation_Mean
+        self.Predicted_Observation_Covariances[:, self.t] = self.Predicted_Observation_Covariance
+        self.Filtered_Residuals[:, self.t] = self.Filtered_Residual
+        self.F_arr[:, self.t] = self.F
+        self.H_arr[:, self.t] = self.H
+
+        self.t += 1
+
+    def UpdateRik(self,observation):
+
+        rho = observation - self.Filtered_State_Mean
+        lambda_hat_2 = max(1/self.m * torch.bmm(rho.mT,rho) - torch.mean(torch.diag(self.R)) - torch.mean(torch.diag(self.Filtered_State_Covariance.squeeze())),0)
+        self.UpdateQ(lambda_hat_2 * torch.eye(self.m))
+
 
     def LogLikelihood(self, Observations, T):
 
@@ -350,6 +401,7 @@ class KalmanSmoother(KalmanFilter):
             IterationCounter = trange(num_itts, desc='EM optimization steps')
 
             if states != None:
+                states = states.squeeze()
                 losses = []
                 loss_fn = torch.nn.MSELoss(reduction='mean')
 

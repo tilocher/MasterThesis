@@ -1,6 +1,6 @@
 # Data Parameters:
 snr: 0 # in [dB]
-signal_length: 360 # Timesteps in an ecg signal
+signal_length: 1000 # Timesteps in an ecg signal
 
 # Computation and logging parameters
 gpu: False # Whether we want to try to use a gpu or not
@@ -11,15 +11,17 @@ wandbGroup: 'EM_Algorithm'
 EM_Its: 50
 EM_vars: [Mu,Sigma,Q,R]
 ConvergenceThreshold: 1.0e-5
+EM_rep: 1000
+Num_Plot_Samples: 10
 
 # How to run the algorithm can be one of:
 # 'All', 'Segmented', 'Consecutive'
-Mode: 'All'
+Mode: 'Consecutive'
 
 # How EM fits the data, can be one of:
-# 'Taylor', 'Prior', 'Identity'
+# 'Taylor', 'Prior', 'Identity', 'Rik'
 Fit: 'Taylor'
-PriorSamples: 1816
+PriorSamples: 20
 
 # Taylor Model parameters
 Window: 'rectangular'

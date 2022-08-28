@@ -5,7 +5,8 @@ import os
 import shutil
 import yaml
 
-LOG_LOCATION = os.path.realpath(r"C:\Users\diloc\Desktop\Timur\Logs")
+# LOG_LOCATION = os.path.realpath(r"C:\Users\diloc\Desktop\Timur\Logs")
+LOG_LOCATION = os.path.realpath(r"E:\MasterThesis\log")
 
 class LocalLogger():
 
@@ -50,7 +51,7 @@ class LocalLogger():
             os.makedirs(self.BaseRunFolderName)
 
         # Filename with numbering system
-        self.RunFileName = datetime.datetime.today().strftime('%d_%m___%H_%M')
+        self.RunFileName = datetime.datetime.today().strftime('%y_%m_%d___%H_%M')
 
         if not self.RunFileName in os.listdir(self.BaseRunFolderName):
             os.makedirs(self.BaseRunFolderName + '/' + self.RunFileName)

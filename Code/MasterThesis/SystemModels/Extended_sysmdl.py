@@ -16,8 +16,12 @@ class SystemModel:
         ####################
         ### Motion Model ###
         ####################
-        self.f = f
-        self.FJacSet = False
+        if f == 'Identity':
+            self.f = self.Identity
+            self.setFJac(self.dIdentityF)
+        else:
+            self.f = f
+            self.FJacSet = False
 
         self.q = q
         self.m = m
@@ -25,8 +29,12 @@ class SystemModel:
         #########################
         ### Observation Model ###
         #########################
-        self.h = h
-        self.HJacSet = False
+        if h == 'Identity':
+            self.h = self.Identity
+            self.setHJac(self.dIdentityH)
+        else:
+            self.h = h
+            self.HJacSet = False
 
         self.r = r
         self.n = n
@@ -62,12 +70,18 @@ class SystemModel:
     #####################
     ### Init Sequence ###
     #####################
-    def InitSequence(self, m1x_0, m2x_0):
+    def InitSequence(self, m1x_0= None, m2x_0= None):
 
-        # self.m1x_0 = torch.squeeze(m1x_0)
-        # self.m2x_0 = torch.squeeze(m2x_0)
-        self.m1x_0 = m1x_0
-        self.m2x_0 = m2x_0
+        if m1x_0 == None:
+            self.m1x_0 = torch.zeros((self.m,1))
+        else:
+            self.m1x_0 = m1x_0
+
+        if m2x_0 == None:
+            self.m2x_0 = torch.eye(self.m)
+        else:
+            self.m2x_0 = m2x_0
+
 
 
     #########################
@@ -244,3 +258,12 @@ class SystemModel:
 
     def SetQ_array(self,Q_array):
         self.Q_array = Q_array
+
+    def Identity(self,x,t):
+        return x
+
+    def dIdentityF(self,x,t):
+        return torch.eye(self.m)
+
+    def dIdentityH(self,x,t):
+        return torch.eye(self.n)
