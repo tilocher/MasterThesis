@@ -3,7 +3,7 @@ import numpy as np
 from numpy import pi
 import torch
 from tqdm import trange
-
+from utils import moving_average
 from SystemModels.Extended_sysmdl import SystemModel
 
 
@@ -82,14 +82,16 @@ class KalmanFilter():
 
     def UpdateQ(self, Q):
         self.Q = Q
+        self.ssModel.UpdateQ(Q)
 
     def UpdateR(self, R):
         self.R = R
+        self.ssModel.UpdateR(R)
 
     def GetQ(self, t):
 
         if self.Q_arr == None:
-            return self.Q
+            return self.ssModel.Q
         else:
             if 'Q' in self.em_averages:
                 return self.Q_arr
@@ -99,7 +101,7 @@ class KalmanFilter():
     def GetR(self, t):
 
         if self.R_arr == None:
-            return self.R
+            return self.ssModel.R
         else:
             if 'R' in self.em_averages:
                 return self.R_arr
@@ -299,37 +301,40 @@ class KalmanFilter():
     def UpdateRik(self,observation):
 
         rho = observation - self.Filtered_State_Mean
-        lambda_hat_2 = max(1/self.m * torch.bmm(rho.mT,rho) - torch.mean(torch.diag(self.R)) - torch.mean(torch.diag(self.Filtered_State_Covariance.squeeze())),0)
+        # lambda_hat_2 = max(1/self.m * torch.bmm(rho.mT,rho) - torch.mean(torch.diag(self.R)) - torch.mean(torch.diag(self.Filtered_State_Covariance.squeeze())),0)
+        lambda_hat_2 = torch.clip(1 / self.m * torch.bmm(rho.mT, rho).squeeze() - torch.diag(self.R) - torch.diag(
+            self.Filtered_State_Covariance.squeeze()),1e-3)
+        # self.UpdateQ(torch.diag(lambda_hat_2))
         self.UpdateQ(lambda_hat_2 * torch.eye(self.m))
 
-
+    @torch.no_grad()
     def LogLikelihood(self, Observations, T):
 
-        with torch.no_grad():
-            self.filter(Observations, T)
+        self.filter(Observations, T)
 
-            loglikelihood = 0.
+        loglikelihood = 0.
 
-            for t in range(T):
-                Residual = self.Filtered_Residuals[:, t]
-                Covariance = self.Predicted_Observation_Covariances[:, t]
+        for t in range(T):
+            Residual = self.Filtered_Residuals[:, t]
+            Covariance = self.Predicted_Observation_Covariances[:, t]
 
-                loglikelihood -= 0.5 * (torch.bmm(Residual.mT,
-                                                  torch.bmm(torch.linalg.pinv(Covariance),
-                                                            Residual)).squeeze() +
-                                        torch.log(torch.linalg.det(Covariance)) +
-                                        self.n * torch.log(2 * torch.tensor(pi)))
+            loglikelihood -= 0.5 * (torch.bmm(Residual.mT,
+                                              torch.bmm(torch.linalg.pinv(Covariance),
+                                                        Residual)).squeeze() +
+                                    torch.log(torch.linalg.det(Covariance)) +
+                                    self.n * torch.log(2 * torch.tensor(pi)))
 
         return loglikelihood
 
 
 class KalmanSmoother(KalmanFilter):
 
-    def __init__(self, ssModel, em_vars=['R'], em_averages=['R'], DiagonalMatrices = []):
+    def __init__(self, ssModel, em_vars=['R','Q'], em_averages=['R'], DiagonalMatrices = []):
 
         super(KalmanSmoother, self).__init__(ssModel, em_vars, em_averages, DiagonalMatrices)
 
     def SGain(self, t):
+
         self.UpdateJacobians(t)
         self.SG = torch.bmm(self.Filtered_State_Covariance,
                             torch.bmm(self.F.mT,
@@ -390,13 +395,13 @@ class KalmanSmoother(KalmanFilter):
 
     def em(self, Observations: torch.Tensor, T: int, q_2: float, r_2: float, num_itts: int = 20,
            states: torch.Tensor = None,
-           ConvergenceThreshold=1e-5):
+           ConvergenceThreshold=1e-5, smoothing_window_Q = -1, smoothing_window_R = -1):
 
         with torch.no_grad():
 
-            self.Q = q_2 * torch.eye(self.m)
+            self.ssModel.UpdateQ( q_2 * torch.eye(self.m))
 
-            self.R = r_2 * torch.eye(self.n)
+            self.ssModel.UpdateR( r_2 * torch.eye(self.n))
 
             IterationCounter = trange(num_itts, desc='EM optimization steps')
 
@@ -426,13 +431,23 @@ class KalmanSmoother(KalmanFilter):
 
                 self.V_x1x1 = self.U_xx[:, 1:]
 
+
                 for EmVar in self.em_vars:
-                    self.__getattribute__(f'EM_Update_{EmVar}')()
+
+                    if EmVar == 'Q':
+                        self.EM_Update_Q(smoothing_window_Q)
+
+                    elif EmVar == 'R':
+                        self.EM_Update_R(smoothing_window_R)
+
+                    else:
+                        self.__getattribute__(f'EM_Update_{EmVar}')()
 
                 self.Average_EM_vars()
 
                 if states != None:
-                    loss = loss_fn(self.Smoothed_State_Means.squeeze(), states.squeeze())
+                    # loss = loss_fn(self.Smoothed_State_Means.squeeze(), states.squeeze())
+                    loss = loss_fn(self.h(self.Smoothed_State_Means.squeeze().T, 0).T, states.squeeze())
                     losses.append(10 * torch.log10(loss))
                     IterationCounter.set_description('Iteration loss: {} [dB]'.format(10 * torch.log10(loss).item()))
 
@@ -465,12 +480,46 @@ class KalmanSmoother(KalmanFilter):
         self.Sigma_diff = torch.abs(torch.mean(self.Initial_State_Covariance - self.Smoothed_State_Covariances[:, 0]))
         self.InitCovariance(self.Smoothed_State_Covariances[:, 0])
 
-    def EM_Update_R(self):
+    def EM_Update_R(self,smoothing_window):
 
-        HU_xy = torch.einsum('Bmp,BTpn->BTmn', (self.H_arr, self.U_yx.mT))
+        if smoothing_window == 0:
+            HU_xy = torch.einsum('Bmp,BTpn->BTmn', (self.H_arr, self.U_yx.mT))
 
-        R_arr = self.U_yy - HU_xy - HU_xy.mT + torch.einsum('Bmp,BTpk,Bkn->BTmn',
-                                                            (self.H_arr, self.U_xx, self.H_arr.mT))
+            R_arr = self.U_yy - HU_xy - HU_xy.mT + torch.einsum('Bmp,BTpk,Bkn->BTmn',
+                                                                (self.H_arr, self.U_xx, self.H_arr.mT))
+
+
+        elif smoothing_window == -1:
+
+            U_yx = self.U_yx.mean(1)
+
+            U_xx = self.U_xx.mean(1)
+
+            U_yy = self.U_yy.mean(1)
+
+            HU_xy = torch.einsum('Bmp,Bpn->Bmn', (self.H_arr, U_yx.mT))
+
+            R_arr = U_yy - HU_xy - HU_xy.mT + torch.einsum('Bmp,Bpk,Bkn->Bmn',
+                                                                (self.H_arr, U_xx, self.H_arr.mT))
+
+            R_arr = R_arr.repeat(1,self.ssModel.T,1,1)
+
+        else:
+
+            U_yx = moving_average(self.U_yx, window_size=smoothing_window)
+
+            U_xx = moving_average(self.U_xx, window_size=smoothing_window)
+
+            U_yy = moving_average(self.U_yy, window_size=smoothing_window)
+
+            HU_xy = torch.einsum('Bmp,Bpn->Bmn', (self.H_arr, U_yx.mT))
+
+            R_arr = U_yy - HU_xy - HU_xy.mT + torch.einsum('Bmp,Bpk,Bkn->Bmn',
+                                                           (self.H_arr, U_xx, self.H_arr.mT))
+
+            R_arr = R_arr.repeat(1, self.ssModel.T, 1, 1)
+
+
 
         try:
             self.R_diff = torch.abs(torch.mean(R_arr.mean(1) - self.R_arr))
@@ -490,41 +539,56 @@ class KalmanSmoother(KalmanFilter):
 
         self.F_arr = F_arr
 
-    def EM_Update_Q(self):
+    def EM_Update_Q(self,smoothing_window):
 
-        FV_xx1 = torch.einsum('Bmp,BTpn->BTmn', (self.F_arr, self.V_x1x.mT))
+        if smoothing_window == 0:
 
-        Q_arr = self.V_x1x1 - FV_xx1 - FV_xx1.mT + \
-                torch.einsum('Bmp,BTpk,Bkn->BTmn', (self.F_arr, self.V_xx, self.F_arr.mT))
-        Q_arr = torch.cat((Q_arr, Q_arr[:, 0].unsqueeze(1)), dim=1)
+            FV_xx1 = torch.einsum('Bmp,BTpn->BTmn', (self.F_arr, self.V_x1x.mT))
+
+            Q_arr = self.V_x1x1 - FV_xx1 - FV_xx1.mT + \
+                    torch.einsum('Bmp,BTpk,Bkn->BTmn', (self.F_arr, self.V_xx, self.F_arr.mT))
+            Q_arr = torch.cat((Q_arr, Q_arr[:, 0].unsqueeze(1)), dim=1)
+
+        elif smoothing_window == -1:
+
+            V_x1x = self.V_x1x.mean(1)
+            V_xx = self.V_xx.mean(1)
+
+            V_x1x1 = self.V_x1x1.mean(1)
+
+            FV_xx1 = torch.einsum('Bmp,Bpn->Bmn', (self.F_arr, V_x1x.mT))
+
+            Q_arr = V_x1x1 - FV_xx1 - FV_xx1.mT + \
+                    torch.einsum('Bmp,Bpk,Bkn->Bmn', (self.F_arr, V_xx, self.F_arr.mT))
+
+            Q_arr = Q_arr.repeat(1, self.ssModel.T, 1, 1)
+
+
+        else:
+
+
+            V_x1x = moving_average(self.V_x1x,window_size=smoothing_window)
+
+            V_xx = moving_average(self.V_xx,window_size=smoothing_window)
+
+            V_x1x1 = moving_average(self.V_x1x1,window_size=smoothing_window)
+
+            FV_xx1 = torch.einsum('Bmp,BTpn->BTmn', (self.F_arr, V_x1x.mT))
+
+            Q_arr = V_x1x1 - FV_xx1 - FV_xx1.mT + \
+                    torch.einsum('Bmp,BTpk,Bkn->BTmn', (self.F_arr, V_xx, self.F_arr.mT))
+
+            Q_arr = Q_arr.repeat(1,self.ssModel.T,1,1)
+
 
         try:
             self.Q_diff = torch.abs(torch.mean(Q_arr - self.Q_arr))
         except TypeError:
             self.Q_diff = torch.inf
 
+
         self.Q_arr = 0.5 * Q_arr + 0.5 * Q_arr.mT
 
-        # window_size = 7
-        # windowed_Q = torch.empty_like(Q_arr)
-        #
-        # for t in range(Q_arr.shape[1]):
-        #
-        #     if t == 360:
-        #         windowed_Q[:,-1,:,:] = Q_arr[:,-1]
-        #     elif t == 0:
-        #         windowed_Q[:,0] = Q_arr[:,0]
-        #     else:
-        #         upper = min(360,t+int(window_size/2))
-        #         lower = max(0,int(window_size/2))
-        #
-        #         mean = Q_arr[:,lower:upper].mean(1)
-        #         windowed_Q[:,t] = mean
-        #
-        # self.Q_arr = windowed_Q
-
-        # Inter = Q_arr.unfold(1, window_size, 1).mean(-1)
-        # self.Q_arr = torch.cat((Inter, Q_arr[:,-window_size+1:]), dim=1)
 
     def Average_EM_vars(self):
 

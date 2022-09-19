@@ -15,16 +15,6 @@ from scipy.optimize import minimize
 from SystemModels.Extended_sysmdl import SystemModel
 from torch.autograd import Variable, Function
 
-# class Taylor_Forward(Function):
-#
-#     def __init__(self,coeffs,):
-#
-#
-#
-#     @staticmethod
-#     def forward(ctx,i):
-
-
 
 
 
@@ -40,7 +30,6 @@ class Taylor_model():
         self.channels = channels
 
         self.basis_functions = torch.from_numpy(np.array([[deltaT**k/scipy.special.factorial(k)] for k in range(1,taylor_order + 1)])).float()
-        # self.basis_functions = self.basis_functions.reshape(( 1, -1)).repeat(( channels, 1))
 
         # Get window parameters
         if 'window' in kwargs.keys():
@@ -148,17 +137,11 @@ class Taylor_model():
         self.time_steps = time_steps
         self.channels = channels
 
-        # basis_functions = self.n_prediction_weight.reshape(-1,1).float() @ self.basis_functions.T
-        # basis_functions = basis_functions.repeat((batch_size,1,1))
-        # basis_functions = self.basis_functions.reshape((1,1,-1)).repeat((batch_size,self.window_size,1))
+
         basis_functions = self.basis_functions.reshape((1, 1, -1)).repeat((self.window_size,batch_size, 1))
 
-        # weights = self.window_weights.repeat((batch_size,1,1))
 
         weights = torch.diag(self.window_weights)
-
-        # basis_functions_w = basis_functions.mT.bmm(torch.sqrt(weights))
-
 
 
         coefficients = torch.zeros((self.taylor_order,channels, time_steps))
@@ -214,7 +197,6 @@ class Taylor_model():
         batch_size = data.shape[0]
 
         basis_functions = self.basis_functions.repeat((1,batch_size)).T
-
 
         coefficients = torch.zeros((self.taylor_order, time_steps))
 

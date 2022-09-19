@@ -1,3 +1,4 @@
+import librosa.core
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -9,7 +10,8 @@ import wandb
 import numpy as np
 import torch
 from Filters.KalmanSmoother import KalmanSmoother, KalmanFilter
-
+from utils import Stich
+import torchlibrosa
 
 class EM_Pipeline(nn.Module):
 
@@ -22,7 +24,10 @@ class EM_Pipeline(nn.Module):
             'Prior_Plot': '.pdf'}
 
     def __init__(self,PriorModel, Logger: LocalLogger, em_parameters:list = ('R','Q', 'Mu','Sigma'),
-                 Mode:str = 'All', AdditionalLogs: dict = {}):
+                 Mode:str = 'All', AdditionalLogs: dict = {}, smoothing_window_Q = -1, smoothing_window_R = -1):
+        """
+        PriorModel: A model
+        """
         super(EM_Pipeline, self).__init__()
 
 
@@ -48,8 +53,13 @@ class EM_Pipeline(nn.Module):
         # Flag if we want to zoom into a specific area
         self.Zoom = True
 
+        # The time window for which to smooth em vars
+        self.smoothing_window_Q = smoothing_window_Q
+        self.smoothing_window_R = smoothing_window_R
+
     def save(self):
         # Save the whole Pipeline as .pt file
+        # pass
         torch.save(self, self.Logger.GetLocalSaveName('Pipelines'))
 
 
@@ -57,26 +67,27 @@ class EM_Pipeline(nn.Module):
             Num_Plot_Samples:int = 10,ConvergenceThreshold:float = 1e-5, EM_rep = None):
 
         try:
+            with torch.no_grad():
 
-            def GetSubset(Data,SplitIndex):
+                def GetSubset(Data,SplitIndex):
 
-                LowerIndices = torch.arange(0,SplitIndex,step=1)
-                UpperIndices = torch.arange(SplitIndex,len(Data),step = 1)
+                    LowerIndices = torch.arange(0,SplitIndex,step=1)
+                    UpperIndices = torch.arange(SplitIndex,len(Data),step = 1)
 
-                LowerSet = torch.utils.data.Subset(Data,LowerIndices)
-                UpperSet = torch.utils.data.Subset(Data,UpperIndices)
-                return LowerSet,UpperSet
+                    LowerSet = torch.utils.data.Subset(Data,LowerIndices)
+                    UpperSet = torch.utils.data.Subset(Data,UpperIndices)
+                    return LowerSet,UpperSet
 
 
-            PriorDataset, TestDataset = GetSubset(Data,PriorSamples)
+                PriorDataset, TestDataset = GetSubset(Data,PriorSamples)
 
-            self.FitPrior(PriorDataset)
+                self.FitPrior(PriorDataset)
 
-            self.PlotPrior()
+                self.PlotPrior()
 
-            self.EM(TestDataset,em_its,Num_Plot_Samples, ConvergenceThreshold, EM_rep= EM_rep)
+                self.EM(TestDataset,em_its,Num_Plot_Samples, ConvergenceThreshold, EM_rep= EM_rep)
 
-            self.save()
+                self.save()
 
         except:
             self.Logger.ForceClose()
@@ -84,20 +95,20 @@ class EM_Pipeline(nn.Module):
 
     def FitPrior(self, PriorSet: Dataset):
         print('Fitting Prior')
-
+        self.PriorLearnSetsize = len(PriorSet)
         try:
             observations,_ = next(iter(DataLoader(PriorSet,batch_size=len(PriorSet))))
             self.PriorModel.fit(observations.squeeze().mT)
-            self.ssModel = self.PriorModel.GetSysModel()
+            self.ssModel = self.PriorModel.getSysModel()
         except ValueError:
             observations = next(iter(DataLoader(PriorSet, batch_size=len(PriorSet))))
             self.PriorModel.fit(observations.squeeze().mT)
-            self.ssModel = self.PriorModel.GetSysModel()
+            self.ssModel = self.PriorModel.getSysModel()
         except NotImplementedError:
 
-            self.ssModel = SystemModel(f = 'Identity', q = 1, h = 'Identity',
-                                       T = PriorSet.T,T_test= PriorSet.T,
-                                       m= PriorSet.m, n= PriorSet.n)
+            self.ssModel = SystemModel(f = 'Identity', q = 1, h = 'Identity', r = 1,
+                                       T = PriorSet.dataset.T,T_test= PriorSet.dataset.T,
+                                       m= PriorSet.dataset.m, n= PriorSet.dataset.n)
 
         self.ssModel.InitSequence(torch.zeros((self.ssModel.m, 1)), torch.eye(self.ssModel.m))
 
@@ -109,9 +120,17 @@ class EM_Pipeline(nn.Module):
 
     def PlotPrior(self):
 
-        self.ssModel.GenerateSequence(self.PriorModel.T)
+        self.ssModel.GenerateSequence(self.ssModel.T)
+
+        # for channel in self.ssModel.x:
+        #
+        #     plt.plot(channel)
+        #     plt.show()
+
+
 
     def EM(self, Data: Dataset, em_its: int, Num_Plot_Samples: int, ConvergenceThreshold: float, EM_rep = None):
+
 
         if self.Mode == 'All':
             self.RegularEM(Data=Data, em_its=em_its,
@@ -130,6 +149,8 @@ class EM_Pipeline(nn.Module):
     def RegularEM(self, Data: Dataset, em_its:int , ConvergenceThreshold: float, Num_Plot_Samples: int):
 
         self.EM_Data = Data
+
+        self.Overlaps = Data.dataset.Overlap
 
         DataSet_length = len(Data)
 
@@ -168,13 +189,21 @@ class EM_Pipeline(nn.Module):
             wandb.log({'Final Loss [dB]': self.EM_losses[-1]})
 
 
+        channel = 0
+        observations, states = Data[-Num_Plot_Samples:]
+        observations = observations[..., channel].reshape(Num_Plot_Samples, -1, 1)
+        states = states[..., channel].reshape(Num_Plot_Samples, -1, 1)
+        results = [self.KalmanSmoother.Smoothed_State_Means[-Num_Plot_Samples:, :, channel]]
+        labels = ['Smoothed states within HB', 'Filtered State consecutive HB']
 
-        self.PlotEMResults(Data, Num_Plot_Samples=Num_Plot_Samples)
+        self.PlotResults(observations, states, results, labels)
+
 
 
 
     def ConsecutiveEM(self, TestSet, em_its,  Num_Plot_Samples, ConvergenceThreshold, EM_rep ):
 
+        self.Overlaps = TestSet.dataset.Overlap
 
         self.EM_Data = TestSet
 
@@ -192,24 +221,29 @@ class EM_Pipeline(nn.Module):
         DataSet_length = len(TestSet)
 
         self.SmoothedResults = torch.empty((DataSet_length,self.ssModel.T,self.ssModel.m))
-
+        self.SmoothedCovariances = torch.empty((DataSet_length,self.ssModel.T,self.ssModel.m,self.ssModel.m))
+        self.FilteredResults = torch.empty((DataSet_length, self.ssModel.T, self.ssModel.m))
+        self.FilteredCovariances = torch.empty((DataSet_length,self.ssModel.T,self.ssModel.m,self.ssModel.m))
 
         TestDataset = DataLoader(TestSet, shuffle=False, batch_size=1)
 
-        self.ConsecutiveSSModel = SystemModel(f = 'Identity', q = 0.01, h = 'Identity', r = 1,
+        q_ini = np.random.random()
+
+        self.ConsecutiveSSModel = SystemModel(f = 'Identity', q = q_ini, h = 'Identity', r = 1,
                                               T = DataSet_length,T_test= DataSet_length,
                                               m= loader.num_samples, n=loader.num_samples )
 
 
+        self.ConsecutiveFilters = [KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma']) for _ in range(self.ssModel.m)]
 
-        self.ConsecutiveFilter = KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma'])
+        self.SecondKalmanSmoother = KalmanSmoother(ssModel=self.ssModel, em_vars=self.em_parameters)
+        self.SecondKalmanSmoother.InitSequence()
+        # self.ConsecutiveFilter = KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma'])
 
         Initial_r_2 = np.random.random()
 
         Initial_q_2 = np.random.random()
 
-        SmootherLoss = 0.
-        FilterLoss = 0.
         loss_fn = torch.nn.MSELoss(reduction='mean')
 
         self.Logger.SaveConfig({'EMSamples': DataSet_length,
@@ -220,12 +254,54 @@ class EM_Pipeline(nn.Module):
                                 'ConvergenceThreshold': ConvergenceThreshold,
                                 'EM_reps': EM_rep})
 
-        self.ConsecutiveFilter.InitSequence(self.prior[channel,:].reshape(-1,1), torch.eye(self.ConsecutiveFilter.m))
-        self.ConsecutiveFilter.InitOnline(DataSet_length)
+        for n,ConsecutiveFilter in enumerate(self.ConsecutiveFilters):
+
+            ConsecutiveFilter.InitSequence(self.prior[n,:].reshape(-1,1), torch.eye(ConsecutiveFilter.m))
+            ConsecutiveFilter.InitOnline(DataSet_length)
 
         try:
 
             for n,(Heartbeat_Obs, Heartbeat_State) in enumerate(tqdm(TestDataset)):
+
+                if n == len(TestSet) -3:
+
+                    start = 100
+                    end = 150
+                    factor = 1.5
+                    amplitudeFactor = 1.3
+                    amplitudeAddition = 0
+
+                    length = (end-start)
+                    newStart = start - int(length*(factor-1)/2)
+                    newEnd = end + int(length*(factor-1)/2)+1
+
+                    noise = Heartbeat_Obs[:,:,newStart:newEnd,0]  - Heartbeat_State[:,:,newStart:newEnd,0]
+
+                    # distortionObs = librosa.core.resample(Heartbeat_Obs[:,:,start:end,0].numpy(),length,length*factor) * amplitudeFactor
+                    if amplitudeFactor >0:
+                        upsample = librosa.core.resample(Heartbeat_State[:,:,start:end,0].numpy(),length, length*factor)
+                        distortion = (np.where(upsample < 0))
+                        # distortion = amplitudeFactor
+                        upsample[distortion] *= (1/amplitudeFactor)
+                        upsample[not distortion] *= amplitudeFactor
+                        distortionState = upsample
+                    else:
+                        distortionState = librosa.core.resample(Heartbeat_State[:, :, start:end, 0].numpy(), length,
+                                                                length * factor)  + amplitudeAddition
+
+                    plt.plot(Heartbeat_State[0, 0, :, 0])
+                    plt.show()
+
+                    Heartbeat_Obs[:,:,newStart:newEnd,0] = torch.from_numpy(distortionState) + noise
+                    Heartbeat_State[:, :, newStart:newEnd,0] = torch.from_numpy(distortionState)
+
+
+                    plt.plot(Heartbeat_State[0,0,:,0])
+                    plt.show()
+
+                    TestSet.dataset.noisy_dataset[-3] = Heartbeat_Obs
+                    TestSet.dataset.centerd_data[-3] = Heartbeat_State
+                #     print('sada')
 
                 if n % EM_rep == 0:
 
@@ -235,35 +311,66 @@ class EM_Pipeline(nn.Module):
                                    q_2=Initial_q_2, r_2=Initial_r_2, states=Heartbeat_State.squeeze()
                                    , ConvergenceThreshold=ConvergenceThreshold)
 
-                    obs = self.KalmanSmoother.Smoothed_State_Means[0,:,channel]
+                    obs = self.KalmanSmoother.Smoothed_State_Means[0]
                 else:
 
                     self.KalmanSmoother.smooth(Heartbeat_Obs.squeeze(), T = self.ssModel.T)
-                    obs = self.KalmanSmoother.Smoothed_State_Means[:,:,channel]
+                    obs = self.KalmanSmoother.Smoothed_State_Means
 
-                self.SmoothedResults[n] = obs
 
-                SmootherLoss += loss_fn(obs.squeeze(),Heartbeat_State[...,channel].squeeze())
+                self.SmoothedResults[n] = obs.squeeze()
 
-                self.ConsecutiveFilter.UpdateR(torch.diag_embed(self.KalmanSmoother.Smoothed_State_Covariances[0,:,channel,channel]))
-                self.ConsecutiveFilter.UpdateOnline(obs)
-                self.ConsecutiveFilter.UpdateRik(obs)
 
-                FilterLoss += loss_fn(self.ConsecutiveFilter.Filtered_State_Mean.squeeze(), Heartbeat_State[...,channel].squeeze())
+                for c, ConsecutiveFilter in enumerate(self.ConsecutiveFilters):
 
-                FilterLoss_dB = 10 * torch.log10(FilterLoss / DataSet_length)
-                SmootherLoss_dB = 10 * torch.log10(SmootherLoss / DataSet_length)
+                    if n % EM_rep == 0:
+                        obs = self.KalmanSmoother.Smoothed_State_Means[0, :, c]
+                        var = self.KalmanSmoother.Smoothed_State_Covariances[0,:,c,c]
+                    else:
+                        obs = self.KalmanSmoother.Smoothed_State_Means[:, :, c]
+                        var = self.KalmanSmoother.Smoothed_State_Covariances[0,:,c,c]
 
-                observations, states = TestSet[-Num_Plot_Samples:]
-                observations = observations[..., channel].reshape(Num_Plot_Samples, -1, 1)
-                states = states[..., channel].reshape(Num_Plot_Samples, -1, 1)
-                results = [self.SmoothedResults[-Num_Plot_Samples:, :, channel],
-                           self.ConsecutiveFilter.Filtered_State_Means[0, -Num_Plot_Samples:]]
-                labels = ['Smoothed states within HB', 'Filtered State consecutive HB']
 
-                self.PlotResults(observations, states, results, labels)
-                print('Filtered Loss: {}[dB]'.format(FilterLoss_dB))
-                print('Smoothed Loss: {}[dB]'.format(SmootherLoss_dB))
+
+                    ConsecutiveFilter.UpdateR(torch.eye(ConsecutiveFilter.m) * var)#.mean())
+
+                    ConsecutiveFilter.UpdateRik(obs)
+
+                    if c==0 and (n == len(TestSet)-3  or n == len(TestSet)-4):
+                        plt.plot(torch.diag(ConsecutiveFilter.R))
+                        plt.show()
+
+                    ConsecutiveFilter.UpdateOnline(obs)
+
+
+                    self.FilteredResults[n,:,c] = ConsecutiveFilter.Filtered_State_Mean.squeeze()
+
+
+            self.FilterLoss_dB = 10*torch.log10(loss_fn(self.FilteredResults,TestSet[:][1].squeeze()) )#/ loss_fn(torch.zeros_like(TestSet[:][1].squeeze()),TestSet[:][1].squeeze()))
+            self.SmootherLoss_dB = 10*torch.log10(loss_fn(self.SmoothedResults,TestSet[:][1].squeeze()))#  / loss_fn(torch.zeros_like(TestSet[:][1].squeeze()),TestSet[:][1].squeeze()))
+
+            if self.wandb:
+                wandb.log({'FilteredLoss':self.FilterLoss_dB,
+                                 'SmoothedLoss': self.SmootherLoss_dB})
+
+            observations, states = TestSet[-Num_Plot_Samples:]
+
+            observations = observations[..., channel].reshape(Num_Plot_Samples, -1, 1)
+            states = states[..., channel].reshape(Num_Plot_Samples, -1, 1)
+
+            states = TestSet.dataset.centerd_data[-Num_Plot_Samples:][...,0].mT
+            observations = TestSet.dataset.noisy_dataset[-Num_Plot_Samples:][...,0].mT
+
+
+            results = [self.SmoothedResults[-Num_Plot_Samples:, :, channel],
+                       self.FilteredResults[-Num_Plot_Samples:, :, channel]]
+            labels = ['Smoothed states within HB', 'Filtered State consecutive HB']
+
+            self.PlotResults(observations, states, results, labels)
+            print('Filtered Loss: {}[dB]'.format(self.FilterLoss_dB))
+            print('Smoothed Loss: {}[dB]'.format(self.SmootherLoss_dB))
+
+            return
 
         except ValueError:
 
@@ -285,14 +392,23 @@ class EM_Pipeline(nn.Module):
 
                 self.SmoothedResults[n] = obs
 
+                for c, ConsecutiveFilter in enumerate(self.ConsecutiveFilters):
 
-                self.ConsecutiveFilter.UpdateR(
-                    torch.diag_embed(self.KalmanSmoother.Smoothed_State_Covariances[0, :, channel, channel]))
-                self.ConsecutiveFilter.UpdateOnline(obs)
-                self.ConsecutiveFilter.UpdateRik(obs)
+                    if n % EM_rep == 0:
+                        obs = self.KalmanSmoother.Smoothed_State_Means[0,:,c]
+                    else:
+                        obs = self.KalmanSmoother.Smoothed_State_Means[:,:,c]
+
+
+                    ConsecutiveFilter.UpdateR(
+                        torch.diag_embed(self.KalmanSmoother.Smoothed_State_Covariances[0, :,  c, c]))
+                    ConsecutiveFilter.UpdateOnline(obs)
+                    ConsecutiveFilter.UpdateRik(obs)
+
+            self.StichedConsectutivlyFiltered = Stich(torch.cat( [ConsecutiveFilter.Filtered_State_Means[0] for ConsecutiveFilter in self.ConsecutiveFilters],dim=-1), self.Overlaps[self.PriorLearnSetsize-1:])
 
             results = [self.SmoothedResults[-Num_Plot_Samples:, :, channel],
-                       self.ConsecutiveFilter.Filtered_State_Means[0, -Num_Plot_Samples:]]
+                       self.ConsecutiveFilters[channel].Filtered_State_Means[0, -Num_Plot_Samples:]]
             labels = ['Smoothed states within HB', 'Filtered State consecutive HB']
 
             observations = TestSet[-Num_Plot_Samples:]
@@ -309,7 +425,8 @@ class EM_Pipeline(nn.Module):
 
         self.EM_losses = self.KalmanSmoother.em(num_itts=em_its, Observations=Observations, T=T,
                                             q_2=q_2, r_2=r_2, states=states
-                                            , ConvergenceThreshold=ConvergenceThreshold)
+                                            , ConvergenceThreshold=ConvergenceThreshold,
+                                                smoothing_window_Q = self.smoothing_window_Q, smoothing_window_R= self.smoothing_window_R)
 
     def PlotResults(self,observations: torch.Tensor, states:torch.Tensor = None, results: list = None, labels: str or list = 'results',
                        prefix:str = ''):
@@ -351,6 +468,8 @@ class EM_Pipeline(nn.Module):
 
         channel = 0
 
+        distinguihable_color = ['#0075DC','#5EF1F2', '#00998F','#000075','#911eb4']
+
 
 
         if states == None:
@@ -362,6 +481,7 @@ class EM_Pipeline(nn.Module):
         for j,(observation, state) in enumerate(zip(observations, states)):
 
             fig_single, ax_single = plt.subplots(figsize = (16,9),dpi=120)
+            figSingleNoWindow, axSingleNoWindow = plt.subplots(figsize = (16,9),dpi=120)
 
             fig_multi ,ax_multi = multi_figures[int(j/(nrows * ncols))]
 
@@ -370,27 +490,41 @@ class EM_Pipeline(nn.Module):
 
             if state != None:
                 ax_single.plot(t,state[...,channel].squeeze(), label = 'Ground Truth', color = 'g')
+                axSingleNoWindow.plot(t, state[..., channel].squeeze(), label='Ground Truth', color='g')
                 current_axes.plot(t,state[...,channel].squeeze(), label = 'Ground Truth', color = 'g')
 
             ax_single.plot(t,observation[...,channel].squeeze(), label = 'Observation', color = 'r', alpha = 0.4)
+            axSingleNoWindow.plot(t,observation[...,channel].squeeze(), label = 'Observation', color = 'r', alpha = 0.4)
+
             current_axes.plot(t,observation[...,channel].squeeze(), label = 'Observation', color = 'r', alpha = 0.4)
 
             for i,(result, label) in enumerate(zip(results, labels)):
-                color = (max(0, i - 1) * 0.5 ** (i - 2), max(0, i) * 0.5 ** (i-1), max(0, i+1) * 0.5 ** i)
+                # color = (max(0, i - 1) * 0.5 ** (i - 2), max(0, i) * 0.5 ** (i-1), max(0, i+1) * 0.5 ** i)
+                color = distinguihable_color[i]
 
                 ax_single.plot(t,result[j].squeeze(), label= label, color = color)
+                axSingleNoWindow.plot(t,result[j].squeeze(), label= label, color = color)
+
                 current_axes.plot(t,result[j].squeeze(), label = label, color = color)
 
             ax_single.legend()
+            axSingleNoWindow.legend()
+
             current_axes.legend()
 
             ax_single.set_xlabel('Time Steps')
+            axSingleNoWindow.set_xlabel('Time Steps')
+
             current_axes.set_xlabel('Time Steps')
 
             ax_single.set_ylabel('Amplitude [mV]')
+            axSingleNoWindow.set_ylabel('Amplitude [mV]')
+
             current_axes.set_ylabel('Amplitude [mV]')
 
             ax_single.set_title('Filtered Signal Sample')
+            axSingleNoWindow.set_title('Filtered Signal Sample')
+
 
 
 
@@ -402,7 +536,8 @@ class EM_Pipeline(nn.Module):
                     axins.plot(t,state,color = 'g')
 
                 for i, (result, label) in enumerate(zip(results, labels)):
-                    color = (max(0, i - 1) * 0.5 ** (i - 2), max(0, i) * 0.5 ** (i - 1), max(0, i + 1) * 0.5 ** i)
+                    # color = (max(0, i - 1) * 0.5 ** (i - 2), max(0, i) * 0.5 ** (i - 1), max(0, i + 1) * 0.5 ** i)
+                    color = distinguihable_color[i]
 
                     axins.plot(t, result[j].squeeze(), label=label, color=color)
 
@@ -420,8 +555,11 @@ class EM_Pipeline(nn.Module):
                 ax_single.indicate_inset_zoom(axins, edgecolor="black")
 
             fig_single.savefig(self.Logger.GetLocalSaveName('Sample_Plots',prefix= f'{prefix}Single_{j}_'))
+            figSingleNoWindow.savefig(self.Logger.GetLocalSaveName('Sample_Plots',prefix= f'{prefix}Single_No_Window_{j}_'))
+
             if self.wandb:
-                wandb.log({'chart': fig_single})
+                pass
+                # wandb.log({'chart': fig_single})
             else:
                 fig_single.show()
 
@@ -429,24 +567,27 @@ class EM_Pipeline(nn.Module):
             multi_fig.savefig(self.Logger.GetLocalSaveName('Sample_Plots',prefix= f'{prefix}Multi_{n}_'))
 
         if self.wandb:
-            wandb.log({'chart':fig_multi})
+            pass
+            # wandb.log({'chart':fig_multi})
         else:
             fig_multi.show()
 
         # Plot multiple HBs
 
-        consecutive_beats = min(7, samples)
+        consecutive_beats = min(10, samples)
 
-        StackedObservations = torch.cat([observations[-beat] for beat in range(consecutive_beats)])
+        StackedObservations = Stich(observations[-consecutive_beats:], self.Overlaps[-consecutive_beats:])
+
         if stateFlag:
-            StackedStates = torch.cat([states[-beat] for beat in range(consecutive_beats)])
-
-        t_cons = np.arange(start=0, stop=consecutive_beats, step= 1 / T)
+            StackedStates = Stich(states[-consecutive_beats:], self.Overlaps[-consecutive_beats:])
 
         Stackedresults = []
-
         for result in results:
-            Stackedresults.append(torch.cat([result[-beat] for beat in range(consecutive_beats)]))
+            Stackedresults.append(Stich(result[-consecutive_beats:], self.Overlaps[-consecutive_beats:]))
+
+        t_cons = np.arange(start=0, stop=consecutive_beats, step= consecutive_beats / len(StackedObservations))
+
+
 
         num_signal = 2 if stateFlag else 1
 
@@ -469,14 +610,19 @@ class EM_Pipeline(nn.Module):
             ax_cons[1].set_title(title_cons)
 
         for j,(result, label) in enumerate(zip(Stackedresults, labels)):
-            color = (max(0, j - 1) * 0.5 ** (j - 2), max(0, j) * 0.5 ** (j - 1), max(0, j + 1) * 0.5 ** j)
+            # color = (max(0, j - 1) * 0.5 ** (j - 2), max(0, j) * 0.5 ** (j - 1), max(0, j + 1) * 0.5 ** j)
+            color = distinguihable_color[j]
             ax_cons[j+num_signal].plot(t_cons,result.squeeze(), color = color)
             ax_cons[j+num_signal].set_title(label)
             ax_cons[j+num_signal].set_xlabel('Time [s]')
             ax_cons[j+num_signal].set_ylabel('Amplitude [mV]')
 
         fig_con.savefig(self.Logger.GetLocalSaveName('Sample_Plots',prefix= f'{prefix}Cons_'))
-        fig_con.show()
+
+        if self.wandb:
+            pass
+        else:
+            fig_con.show()
 
 
 
@@ -526,11 +672,67 @@ class Constant_Pipeline(EM_Pipeline):
 class Taylor_Pipeline(EM_Pipeline):
 
     def __init__(self,PriorModel, Logger: LocalLogger, em_parameters:list = ('R','Q', 'Mu','Sigma'),
-                 Mode:str = 'All', AdditionalLogs: dict = {}):
+                 Mode:str = 'All', AdditionalLogs: dict = {}, smoothing_window_Q = -1, smoothing_window_R = -1):
 
         super(Taylor_Pipeline, self).__init__(PriorModel,Logger,em_parameters,
+                                                     Mode,AdditionalLogs,
+                                              smoothing_window_Q = smoothing_window_Q, smoothing_window_R = smoothing_window_R)
+
+########################################################################################################################
+########################################################################################################################
+################################################ Identity Model Pipeline ################################################
+########################################################################################################################
+########################################################################################################################
+
+class Identity_Pipeline(EM_Pipeline):
+
+    def __init__(self,PriorModel, Logger: LocalLogger, em_parameters:list = ('R','Q', 'Mu','Sigma'),
+                 Mode:str = 'All', AdditionalLogs: dict = {}):
+
+        super(Identity_Pipeline, self).__init__(PriorModel,Logger,em_parameters,
+                                                     Mode,AdditionalLogs)
+########################################################################################################################
+########################################################################################################################
+################################################ Identity Model Pipeline ################################################
+########################################################################################################################
+########################################################################################################################
+
+class Prior_Pipeline(EM_Pipeline):
+
+    def __init__(self,PriorModel, Logger: LocalLogger, em_parameters:list = ('R','Q', 'Mu','Sigma'),
+                 Mode:str = 'All', AdditionalLogs: dict = {}):
+
+        super(Prior_Pipeline, self).__init__(PriorModel,Logger,em_parameters,
                                                      Mode,AdditionalLogs)
 
+    def InitFilter(self,Input,Target):
+        self.KalmanSmoother.InitMean(Target[:, 0, 0].unsqueeze(-1))
+
+    def FitPrior(self, PriorSet: Dataset):
+        print('Fitting Prior')
+        self.PriorLearnSetsize = len(PriorSet)
+        try:
+            observations,_ = next(iter(DataLoader(PriorSet,batch_size=len(PriorSet))))
+            self.PriorModel.fit(observations.squeeze().mT)
+            self.ssModel = self.PriorModel.GetSysModel()
+        except ValueError:
+            observations = next(iter(DataLoader(PriorSet, batch_size=len(PriorSet))))
+            self.PriorModel.fit(observations.squeeze().mT)
+            self.ssModel = self.PriorModel.GetSysModel()
+        except NotImplementedError:
+
+            self.ssModel = SystemModel(f = 'Identity', q = 1, h = 'Identity', r = 1,
+                                       T = PriorSet.dataset.T,T_test= PriorSet.dataset.T,
+                                       m= PriorSet.dataset.m, n= PriorSet.dataset.n)
+
+        self.ssModel.InitSequence(torch.zeros((self.ssModel.m, 1)), torch.eye(self.ssModel.m))
+
+        self.KalmanSmoother = KalmanSmoother(ssModel=self.ssModel, em_vars=self.em_parameters)
+        self.KalmanSmoother.OnlyPrior = True
+        self.KalmanSmoother.InitSequence()
+
+        self.ssModel.GenerateSequence(self.ssModel.T)
+        self.prior = self.ssModel.x
 
 ########################################################################################################################
 ########################################################################################################################
@@ -542,22 +744,62 @@ class Taylor_Pipeline(EM_Pipeline):
 class Rik_Pipeline(EM_Pipeline):
 
     def __init__(self, PriorModel, Logger: LocalLogger, em_parameters: list = ('R', 'Q', 'Mu', 'Sigma'),
-                 Mode: str = 'All', AdditionalLogs: dict = {}):
+                 Mode: str = 'All', AdditionalLogs: dict = {}, smoothing_window_Q = -1, smoothing_window_R = -1):
 
-        self.Logs = {'Pipeline':'.pt',
+        self.Logs = {'Pipelines':'.pt',
                      'Sample_Plots':'.pdf',
                      }
 
         super(Rik_Pipeline, self).__init__(PriorModel, Logger, em_parameters,
-                                                   Mode, AdditionalLogs)
+                                                   Mode, AdditionalLogs,smoothing_window_Q,smoothing_window_R)
 
 
     def FitPrior(self, PriorSet: Dataset):
 
         Data = DataLoader(PriorSet, batch_size= len(PriorSet))
-        obs,states = next(iter(Data))
+        # obs,states = next(iter(Data))
 
-        self.ObservationCovariave = obs.std()
+        obs, states = next(iter(Data))
+
+        self.ObservationCovariace = []
+
+        for channel in range(obs.shape[-1]):
+
+            Y_minus_i = torch.cat((obs[...,:channel],obs[...,channel+1:]),dim=-1).squeeze()
+            y = obs[...,channel].squeeze()
+
+            gamma = torch.linalg.pinv(Y_minus_i.mT.bmm(Y_minus_i)).bmm( Y_minus_i.mT).bmm(y.unsqueeze(-1))
+
+            w = y.unsqueeze(-1) - Y_minus_i.bmm(gamma)
+
+            self.ObservationCovariace.append(w.std())
+
+        self.PriorLearnSetsize = len(PriorSet)
+        try:
+            observations, _ = next(iter(DataLoader(PriorSet, batch_size=len(PriorSet))))
+            self.PriorModel.fit(observations.squeeze().mT)
+            self.ssModel = self.PriorModel.GetSysModel()
+        except ValueError:
+            observations = next(iter(DataLoader(PriorSet, batch_size=len(PriorSet))))
+            self.PriorModel.fit(observations.squeeze().mT)
+            self.ssModel = self.PriorModel.GetSysModel()
+        except NotImplementedError:
+
+            self.ssModel = SystemModel(f='Identity', q=1, h='Identity', r=1,
+                                       T=PriorSet.dataset.T, T_test=PriorSet.dataset.T,
+                                       m=PriorSet.dataset.m, n=PriorSet.dataset.n)
+
+        self.ssModel.InitSequence(torch.zeros((self.ssModel.m, 1)), torch.eye(self.ssModel.m))
+
+        self.KalmanSmoother = KalmanSmoother(ssModel=self.ssModel, em_vars=self.em_parameters)
+        self.KalmanSmoother.InitSequence()
+
+        self.ssModel.GenerateSequence(self.ssModel.T)
+
+
+
+
+        # self.ObservationCovariave = obs.std()
 
 
     def Run(self, Data: Dataset,PriorSamples:int = 100 , em_its:int = 10,
@@ -582,6 +824,8 @@ class Rik_Pipeline(EM_Pipeline):
 
             self.FilterConsecutive(TestDataset, Num_Plot_Samples)
 
+            self.save()
+
         except:
             self.Logger.ForceClose()
             raise
@@ -589,39 +833,54 @@ class Rik_Pipeline(EM_Pipeline):
 
     def FilterConsecutive(self,TestDataset,Num_Plot_Samples = 10):
 
-        T = TestDataset.dataset.T
-        q_init = np.random.random()
-        self.ConsecutiveSSModel = SystemModel('Identity',q_init, 'Identity', self.ObservationCovariave,
-                                              len(TestDataset), len(TestDataset), T,T)
-
-        self.ConsecutiveSSModel.InitSequence()
-
-        self.ConsecutiveFilter = KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices= ['F','H','R','Q','Sigma'])
-        self.ConsecutiveFilter.InitSequence()
-
         TestLoader = DataLoader(TestDataset, batch_size=1)
 
-        self.ConsecutiveFilter.InitOnline(len(TestLoader))
 
+        T = TestDataset.dataset.T
+        channels = TestDataset.dataset.channels
+        Samples = len(TestLoader)
+        q_init = np.random.random()
+
+        self.FilteredStates = torch.empty(Samples,T,channels)
+
+
+        self.ConsecutiveSSModels = [SystemModel('Identity',q_init, 'Identity', self.ObservationCovariace[i],
+                                              len(TestDataset), len(TestDataset), T,T) for i in range(channels)]
+
+
+        self.Overlaps = TestDataset.dataset.Overlap
+
+        for ConsecutiveSSModel in self.ConsecutiveSSModels:
+            ConsecutiveSSModel.InitSequence()
+
+        self.ConsecutiveFilters = [KalmanFilter(ConsecutiveSSModel, DiagonalMatrices= ['F','H','R','Q','Sigma']) for ConsecutiveSSModel in self.ConsecutiveSSModels]
+
+        for ConsecutiveFilter in self.ConsecutiveFilters:
+            ConsecutiveFilter.InitSequence()
+            ConsecutiveFilter.InitOnline(len(TestLoader))
 
         for j, (observation, state) in enumerate(TestLoader):
 
-            self.ConsecutiveFilter.UpdateOnline(observation[...,0].reshape(-1,1))
-            self.ConsecutiveFilter.UpdateRik(observation[...,0].reshape(-1,1))
+            for channel in range(channels):
 
-            # plt.plot(observation[..., 0].squeeze(), label='Observation', color='r', alpha=0.4)
-            # plt.plot(state[..., 0].squeeze(), label='State', color='g')
-            # plt.plot(self.ConsecutiveFilter.Filtered_State_Mean.squeeze(), label='Filter', color='b')
-            # plt.legend()
-            # plt.show()
+                self.ConsecutiveFilters[channel].UpdateRik(observation[...,channel].reshape(-1,1))
 
+                self.ConsecutiveFilters[channel].UpdateOnline(observation[...,channel].reshape(-1,1))
+
+                self.FilteredStates[j,:,channel] = self.ConsecutiveFilters[channel].Filtered_State_Mean.squeeze()
 
 
         loss_fn = torch.nn.MSELoss(reduction = 'mean')
 
-        loss = loss_fn(TestDataset[:][1][...,0].mT, self.ConsecutiveFilter.Filtered_State_Means)
 
-        print(f'Loss {10*torch.log10(loss)}[dB]')
+        loss = loss_fn(TestDataset[:][1], self.FilteredStates)
+
+        self.FilterLoss_dB =(
+            loss_fn(self.FilteredStates, TestDataset[:][1].squeeze()) / loss_fn(torch.zeros_like(TestDataset[:][1].squeeze()),
+                                                                             TestDataset[:][1].squeeze()))
+
+
+        print(f'Loss {10*torch.log10(self.FilterLoss_dB)}[dB]')
 
 
 
@@ -629,12 +888,302 @@ class Rik_Pipeline(EM_Pipeline):
         observations, states = TestDataset[-Num_Plot_Samples:]
         observations = observations[...,0].reshape(Num_Plot_Samples,-1,1)
         states = states[...,0].reshape(Num_Plot_Samples,-1,1)
-        results = [self.ConsecutiveFilter.Filtered_State_Means[0,-Num_Plot_Samples:]]
-        labels = ['Filtered State consecutive HB']
+        results = [self.FilteredStates[-Num_Plot_Samples:,:,0]]
+        labels = ['Filtered State consecutive HB', 'Smoothed State consecutive HB']
 
         self.PlotResults(observations,states,results,labels)
 
+########################################################################################################################
+########################################################################################################################
+################################################ Synthetic Model Pipeline ################################################
+########################################################################################################################
+########################################################################################################################
 
+
+
+class Synthetic_Pipeline(EM_Pipeline):
+
+    def __init__(self, PriorModel, Logger: LocalLogger, em_parameters: list = ('R', 'Q', 'Mu', 'Sigma'),
+                 Mode: str = 'All', AdditionalLogs: dict = {}):
+
+        self.Logs = {'Pipeline':'.pt',
+                     'Sample_Plots':'.pdf',
+                     }
+
+        super(Synthetic_Pipeline, self).__init__(PriorModel, Logger, em_parameters,
+                                                   Mode, AdditionalLogs)
+
+    def FitPrior(self, PriorSet: Dataset):
+
+        self.ssModel = self.PriorModel
+        ini = torch.zeros((self.ssModel.m, 1))
+        ini[0] = -torch.pi
+        self.ssModel.InitSequence(ini, torch.eye(self.ssModel.m))
+
+        self.KalmanSmoother = KalmanSmoother(ssModel=self.ssModel, em_vars=self.em_parameters)
+        self.KalmanSmoother.InitSequence()
+
+        self.ssModel.GenerateSequence(self.ssModel.T)
+        self.prior = self.ssModel.x
+
+    def InitFilter(self, Input, Target):
+        ini = torch.zeros((self.ssModel.m, 1))
+        ini[0] = -torch.pi
+        ini[1:] = Input[0,0,0].unsqueeze(-1)
+        self.KalmanSmoother.InitMean(ini)
+
+
+########################################################################################################################
+########################################################################################################################
+################################################ AE Model Pipeline ################################################
+########################################################################################################################
+########################################################################################################################
+
+class ReducedSystem(SystemModel):
+
+    def __init__(self,NN,r,h,q,T,T_test,m,n):
+
+        self.NN = NN
+
+        super(ReducedSystem, self).__init__(self.f,r,h,q,T,T_test,m,n)
+
+        self.FJacSet = True
+        self.HJacSet = True
+
+
+
+    def prime(self, data):
+
+        self.data = self.NN(data.to(self.NN.dev)).squeeze().cpu()
+
+        self.data_derivative = torch.cat((torch.diff(self.data,dim=0),torch.zeros(1,self.data.shape[-1])))
+
+    def f(self,x,t):
+        return self.data[t].reshape(-1,1)
+
+    def getFJacobian(self,x,t):
+
+        dF = torch.zeros((self.m,self.m))
+
+        for i in range(self.m):
+            dF[i,i] = self.data_derivative[t,i]
+        return dF
+
+
+
+class AE_Pipeline(EM_Pipeline):
+
+    def __init__(self,dummy,Logger, em_parameters,
+                                                 Mode, AdditionalLogs = {}, smoothing_window_Q=0,smoothing_window_R=0):
+
+        from NNs.AutoEncoder import AutoEncoder
+        from SystemModels.Extended_sysmdl import SystemModel
+
+
+
+        # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_11___21_42\Logs\Models\Models.pt")
+        # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_13___09_01\Logs\Models\Models.pt")
+
+        # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_13___09_11\Logs\Models\Models.pt")
+
+        PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_13___11_44\Logs\Models\Models.pt")
+
+        super(AE_Pipeline, self).__init__(PriorModel, Logger, em_parameters,
+                                                 Mode, AdditionalLogs)
+
+    def NN_forward(self, data, t):
+
+        inference = self.PriorModel(data)
+
+        return inference[0,:,t,:]
+
+
+
+    def FitPrior(self, PriorSet: Dataset):
+
+        T = PriorSet.dataset.T
+        m = PriorSet.dataset.channels
+        n = PriorSet.dataset.channels
+
+
+
+        self.ssModel = ReducedSystem(self.PriorModel, 0, 'Identity', 0, T, T ,m,n)
+        self.ssModel.InitSequence(torch.zeros((self.ssModel.m, 1)), torch.eye(self.ssModel.m))
+
+        self.KalmanSmoother = KalmanSmoother(ssModel=self.ssModel, em_vars=self.em_parameters)
+        self.KalmanSmoother.InitSequence()
+
+    def PlotPrior(self):
+        pass
+
+    def ConsecutiveEM(self, TestSet, em_its,  Num_Plot_Samples, ConvergenceThreshold, EM_rep ):
+
+        self.Overlaps = TestSet.dataset.Overlap
+
+        self.EM_Data = TestSet
+
+        channel = 0
+
+        try:
+            loader = TestSet.dataset
+        except AttributeError:
+
+            try:
+                loader = TestSet
+            except:
+                raise
+
+        DataSet_length = len(TestSet)
+
+        self.SmoothedResults = torch.empty((DataSet_length,self.ssModel.T,self.ssModel.m))
+        self.FilteredResults = torch.empty((DataSet_length, self.ssModel.T, self.ssModel.m))
+        self.NNResults = torch.empty((DataSet_length, self.ssModel.T, self.ssModel.m))
+
+
+        TestDataset = DataLoader(TestSet, shuffle=False, batch_size=1)
+
+        self.ConsecutiveSSModel = SystemModel(f = 'Identity', q = 0.01, h = 'Identity', r = 1,
+                                              T = DataSet_length,T_test= DataSet_length,
+                                              m= loader.num_samples, n=loader.num_samples )
+
+
+        self.ConsecutiveFilters = [KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma']) for _ in range(self.ssModel.m)]
+
+        # self.ConsecutiveFilter = KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma'])
+
+        Initial_r_2 = np.random.random()
+
+        Initial_q_2 = np.random.random()
+
+        SmootherLoss = 0.
+        FilterLoss = 0.
+        loss_fn = torch.nn.MSELoss(reduction='mean')
+
+        self.Logger.SaveConfig({'EMSamples': DataSet_length,
+                                'EM_Parameters': self.em_parameters,
+                                'Initial_r_2': Initial_r_2,
+                                'Initial_q_2': Initial_q_2,
+                                'EM_Its': em_its,
+                                'ConvergenceThreshold': ConvergenceThreshold,
+                                'EM_reps': EM_rep})
+
+        for n,ConsecutiveFilter in enumerate(self.ConsecutiveFilters):
+
+            ConsecutiveFilter.InitSequence(torch.zeros((self.ssModel.T, 1)), torch.eye(ConsecutiveFilter.m))
+            ConsecutiveFilter.InitOnline(DataSet_length)
+
+
+
+        for n,(Heartbeat_Obs, Heartbeat_State) in enumerate(tqdm(TestDataset)):
+
+            if n == len(TestSet) - 3:
+                Heartbeat_Obs[:, :, 30:50] += 0.5
+                Heartbeat_State[:, :, 30:50] += 0.5
+
+
+            with torch.no_grad():
+
+                NN_inference = self.ssModel.NN(Heartbeat_Obs.to(self.ssModel.NN.dev)).squeeze().cpu()
+
+            self.NNResults[n] = NN_inference
+
+
+            # if n % EM_rep == 0:
+            #
+            #     self.InitFilter(Heartbeat_Obs, Heartbeat_State)
+            #
+            #     self.KalmanSmoother.ssModel.prime(Heartbeat_Obs)
+            #
+            #     self.PerformEM(em_its=em_its, Observations=Heartbeat_Obs.squeeze(), T = self.ssModel.T,
+            #                    q_2=Initial_q_2, r_2=Initial_r_2, states=Heartbeat_State.squeeze()
+            #                    , ConvergenceThreshold=ConvergenceThreshold)
+            #
+            #     obs = self.KalmanSmoother.Smoothed_State_Means[0]
+            # else:
+            #     self.KalmanSmoother.ssModel.prime(Heartbeat_Obs)
+            #
+            #     self.KalmanSmoother.smooth(Heartbeat_Obs.squeeze(), T = self.ssModel.T)
+            #     obs = self.KalmanSmoother.Smoothed_State_Means
+            #
+            # self.SmoothedResults[n] = obs.squeeze()
+
+
+
+            for c, ConsecutiveFilter in enumerate(self.ConsecutiveFilters):
+
+                # if n % EM_rep == 0:
+                #     obs = self.KalmanSmoother.Smoothed_State_Means[0, :, c]
+                # else:
+                #     obs = self.KalmanSmoother.Smoothed_State_Means[:, :, c]
+
+                obs = NN_inference[...,c].reshape(-1,1)
+
+                Y_minus_i = torch.cat((NN_inference[..., :c], NN_inference[..., c + 1:]), dim=-1).squeeze()
+                y = NN_inference[..., c].squeeze()
+
+                gamma = torch.linalg.pinv(Y_minus_i.T.mm(Y_minus_i)).mm(Y_minus_i.T).mm(y.unsqueeze(-1))
+
+                w = y.unsqueeze(-1) - Y_minus_i.mm(gamma)
+
+                var = w.var()
+
+                # var = (obs - Heartbeat_State).var()
+
+                # ConsecutiveFilter.UpdateR(
+                #     torch.diag_embed(self.KalmanSmoother.Smoothed_State_Covariances[0, :, c, c]))
+                ConsecutiveFilter.UpdateR(
+                    torch.eye(ConsecutiveFilter.m) *var)#* self.KalmanSmoother.Smoothed_State_Covariances[0, :, c,
+                                                     #c].mean())
+                ConsecutiveFilter.UpdateRik(obs)
+
+                # ConsecutiveFilter.UpdateR(torch.eye(ConsecutiveFilter.m) * loss_fn(Heartbeat_State[...,c].squeeze(),self.SmoothedResults[n][...,c]))
+                ConsecutiveFilter.UpdateOnline(obs)
+
+                self.FilteredResults[n,:,c] = ConsecutiveFilter.Filtered_State_Mean.squeeze()
+
+
+
+
+        self.FilterLoss_dB = 10*torch.log10(loss_fn(self.FilteredResults,TestSet[:][1].squeeze()))
+        self.SmootherLoss_dB = 10*torch.log10(loss_fn(self.SmoothedResults,TestSet[:][1].squeeze()))
+        self.AELoss_dB = 10 * torch.log10(loss_fn(self.NNResults, TestSet[:][1].squeeze()))
+
+        observations, states = TestSet[-Num_Plot_Samples:]
+        observations = observations[..., channel].reshape(Num_Plot_Samples, -1, 1)
+        observations[-3, 30:50] += 0.5
+
+        states = states[..., channel].reshape(Num_Plot_Samples, -1, 1)
+
+        states[-3, 30:50] += 0.5
+        results = [self.NNResults[-Num_Plot_Samples:,:,channel],
+                   self.ConsecutiveFilters[channel].Filtered_State_Means[0, -Num_Plot_Samples:]
+                   ]
+        labels = [ 'AE output','Filtered State consecutive HB' ]
+
+        self.PlotResults(observations, states, results, labels)
+        print('Filtered Loss: {}[dB]'.format(self.FilterLoss_dB))
+        print('AE Loss: {}[dB]'.format(self.AELoss_dB))
+
+
+        return
+
+    ########################################################################################################################
+    ########################################################################################################################
+    ################################################ Arima Model Pipeline ################################################
+    ########################################################################################################################
+    ########################################################################################################################
+
+
+class Arima_Pipeline(EM_Pipeline):
+    pass
+
+    # def __init__(self,PriorModel, Logger: LocalLogger, em_parameters:list = ('R','Q', 'Mu','Sigma'),
+    #          Mode:str = 'All', AdditionalLogs: dict = {}, smoothing_window_Q = -1, smoothing_window_R = -1):
+    #
+    #
+    #
+    #
+    #     super(Arima_Pipeline, self).__init__(PriorModel,Logger,em_parameters,Mode,AdditionalLogs,smoothing_window_Q,smoothing_window_R)
 
 
 

@@ -8,3 +8,6 @@ tqdm>=4.64.0
 wfdb>=4.0.0
 mne>=1.0.3
 scipy>=1.8.1
+pandas~=1.4.3
+statsmodels~=0.13.2
+scikit-learn~=1.1.1

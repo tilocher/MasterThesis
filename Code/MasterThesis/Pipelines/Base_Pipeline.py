@@ -20,12 +20,13 @@ class Pipeline():
 
 
         Logs = {'Models':'.pt', 'Pipelines':'.pt','ONNX_models':'.onnx','CV_Loss':'.pdf', 'Train_Loss':'.pdf',
-                'SamplePlots':'.pdf'}
+                'Sample_Plots':'.pdf'}
 
         if 'AdditionalLogs' in kwargs.keys(): Logs.update(kwargs['AdditionalLogs'])
 
         self.Logger = Logger
 
+        self.Zoom = True
 
         if torch.cuda.is_available() and gpu:
             self.dev = torch.device("cuda:0")
@@ -193,21 +194,26 @@ class Pipeline():
             # Cross Validation Mode
             self.model.eval()
 
-            CV_Dataloader = DataLoader(CV_Dataset, shuffle=False, batch_size=N_CV)
+            CV_size = min(N_CV, 128)
+
+            CV_Dataloader = DataLoader(CV_Dataset, shuffle=False, batch_size=CV_size)
 
 
             self.InitModel(N_CV,**kwargs)
 
+            batch_cv_loss = 0.
 
             for cv_input, cv_target in CV_Dataloader:
 
                 Inference_out, cv_loss = self.Run_Inference(cv_input, cv_target, **kwargs)
 
+                batch_cv_loss += cv_loss
 
-                self.MSE_train_linear_epoch[ti] = cv_loss.detach()
-                self.MSE_cv_dB_epoch[ti] = 10 * torch.log10(cv_loss).detach()
 
-                Epoch_cv_loss_lin = cv_loss.item()
+            self.MSE_train_linear_epoch[ti] = batch_cv_loss.detach()
+            self.MSE_cv_dB_epoch[ti] = 10 * torch.log10(batch_cv_loss).detach()
+
+            Epoch_cv_loss_lin = batch_cv_loss.item()
 
             if (self.MSE_cv_dB_epoch[ti] < MSE_cv_dB_opt):
 
@@ -376,6 +382,8 @@ class Pipeline():
 
         Test_Dataloader = DataLoader(Test_Dataset, shuffle=False, batch_size= N_T)
 
+        self.Overlaps = Test_Dataset.dataset.Overlap
+
         with torch.no_grad():
 
             self.InitModel(N_T,**kwargs)
@@ -387,7 +395,17 @@ class Pipeline():
 
                 self.MSE_test_linear_arr = torch.mean(test_loss,dim=[n for n in range(1,test_loss.ndim)])
 
-                self.PlotResults(test_input,test_target,Inference_out,**kwargs)
+            num_plot_samples = 10
+
+            observations,states = (Test_Dataset[-num_plot_samples:])
+
+            observations = observations[:,0].cpu()
+            states = states[:,0].cpu()
+
+            results = [Inference_out[-num_plot_samples:,0].cpu()]
+            labels = ['Autoencoder prediction']
+
+            self.PlotResults(observations,states,results,labels,**kwargs)
 
 
             self.MSE_test_linear_avg = self.MSE_test_linear_arr.mean()
@@ -401,7 +419,7 @@ class Pipeline():
 
         self.save()
 
-    def PlotResults(self,test_input,test_target,predictions,**kwargs):
+    def PlotResults(self, observations, states,results,labels,prefix,**kwargs):
         pass
 
     def InitTraining(self,Batch_size,**kwargs):

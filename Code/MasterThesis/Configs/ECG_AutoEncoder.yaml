@@ -2,6 +2,7 @@
 snr: 0 # in [dB]
 signal_length: 360 # Timesteps in an ecg signal
 gpu: True # Whether we want to try to use a gpu or not
+preprocess: False
 
 LoggerName: 'AutoEncoder'
 wandb: False
@@ -9,11 +10,11 @@ wandbGroup: 'AutoEncoder_Segmented'
 
 # Data Parameters
 roll: 0
-Segmented: True
+Segmented: False
 
 # NN Parameters
 LatentSpace: 50
-Epochs: 100
+Epochs: 200
 L2: 1.0e-6
 lr: 1.0e-3
 BatchSize: 32

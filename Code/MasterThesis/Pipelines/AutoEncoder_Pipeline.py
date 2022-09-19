@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 import wandb
 from log.BaseLogger import LocalLogger, WandbLogger
 from torch.utils.data.dataloader import DataLoader
-
+from utils import Stich
 
 class ECG_AE_Pipeline(Pipeline):
 
@@ -65,110 +65,158 @@ class ECG_AE_Pipeline(Pipeline):
 
         return SegmentedOutput, loss
 
-    def PlotResults(self, test_input, test_target, predictions,**kwargs):
+    def PlotResults(self, observations, states,results,labels,prefix:str = '',**kwargs):
 
-        # if self.Segmented:
-        #     for seg,(inp,tar,pred) in enumerate(zip(test_input,test_target,predictions)):
-        #
-        #         inp  = inp.squeeze()
-        #         tar = tar.squeeze()
-        #         pred = pred.squeeze()
-        #
-        #         random_sample_index = 0
-        #         random_channel = 0
-        #
-        #         plt.plot(inp[random_sample_index, :, random_channel].detach().cpu(), label='Observations',
-        #                  alpha=0.4,
-        #                  color='r')
-        #         plt.plot(tar[random_sample_index, :, random_channel].detach().cpu(), label='Ground truth',
-        #                  color='g')
-        #         plt.plot(pred[random_sample_index, :, random_channel].detach().cpu(), label='Prediction',
-        #                  color='b')
-        #         plt.title(f'Test Sample from channel {random_channel}')
-        #         plt.xlabel('Time Steps')
-        #         plt.ylabel('Amplitude [mV]')
-        #         plt.legend()
-        #         plt.savefig(self.Logger.GetLocalSaveName('SegmentPlot', prefix=f'{seg}_'))
-        #
-        #         if self.wandb:
-        #             wandb.log({'chart': plt})
-        #             plt.clf()
-        #
-        #         else:
-        #             plt.show()
-        #
-        #
-        #     test_input = torch.cat(test_input, -2)
-        #     test_target = torch.cat(test_target, -2)
-        #     predictions = torch.cat(predictions,-2)
+        """
+            Plot filtered samples as well as the observation and the state
+            observations: The observed signal with shape (samples, Time, channels)
+            states: The ground truth signal with shape (samples, Time, channels)
+            """
 
-        num_samples = 5
+        samples, T, channels = observations.shape
 
-        if 'segment' in kwargs.keys():
-            segment = kwargs['segment']
-            test_input = test_input[segment]
-            test_target = test_target[segment]
+        t = np.arange(start=0, stop=1, step=1 / T)
 
-        test_input = test_input.squeeze()
-        test_target = test_target.squeeze()
-        predictions = predictions.squeeze()
+        nrows = 2
+        ncols = 2
 
-        for i in range(num_samples):
+        multi_figures = [plt.subplots(nrows=nrows, ncols=ncols, figsize=(16, 9), dpi=120) for i in
+                         range(int(np.ceil(samples / (ncols * nrows))))]
+        for fig, _ in multi_figures:
+            fig.set_tight_layout(True)
+            fig.suptitle('Filtered Signal Samples')
 
-            # random_sample_index = np.random.randint(0,test_input.shape[0])
-            # random_sample_index = np.random.randint(0,test_input.shape[0])
+        channel = 0
 
-            # random_channel =  np.random.randint(0,2)
+        if states == None:
+            stateFlag = False
+            states = [None for _ in range(samples)]
+        else:
+            stateFlag = True
 
-            fig, ax = plt.subplots(dpi=200)
+        for j, (observation, state) in enumerate(zip(observations, states)):
 
-            random_sample_index = i
-            random_channel = 0
+            fig_single, ax_single = plt.subplots(figsize=(16, 9), dpi=120)
 
-            ax.plot(test_input[random_sample_index, :, random_channel].detach().cpu(), label='Observations', alpha=0.4,
-                     color='r')
-            ax.plot(test_target[random_sample_index, :, random_channel].detach().cpu(), label='Ground truth',
-                     color='g')
-            ax.plot(predictions[random_sample_index, :, random_channel].detach().cpu(), label='Prediction', color='b')
-            ax.set_title(f'Test Sample from channel {random_channel}')
-            ax.set_xlabel('Time Steps')
-            ax.set_ylabel('Amplitude [mV]')
-            plt.legend()
-            if not self.Segmented:
+            fig_multi, ax_multi = multi_figures[int(j / (nrows * ncols))]
 
-                axins = ax.inset_axes([0.05, 0.5, 0.4, 0.4])
+            current_axes = ax_multi[int(j % (nrows * ncols) / nrows), j % ncols]
 
-                axins.plot(test_target[random_sample_index, :, random_channel].detach().cpu(), color='g')
-                axins.plot(predictions[random_sample_index, :, random_channel].detach().cpu(), color='b')
+            if state != None:
+                ax_single.plot(t, state[..., channel].squeeze(), label='Ground Truth', color='g')
+                current_axes.plot(t, state[..., channel].squeeze(), label='Ground Truth', color='g')
+
+            ax_single.plot(t, observation[..., channel].squeeze(), label='Observation', color='r', alpha=0.4)
+            current_axes.plot(t, observation[..., channel].squeeze(), label='Observation', color='r', alpha=0.4)
+
+            for i, (result, label) in enumerate(zip(results, labels)):
+                color = (max(0, i - 1) * 0.5 ** (i - 2), max(0, i) * 0.5 ** (i - 1), max(0, i + 1) * 0.5 ** i)
+
+                ax_single.plot(t, result[j,...,channel].squeeze(), label=label, color=color)
+                current_axes.plot(t, result[j,...,channel].squeeze(), label=label, color=color)
+
+            ax_single.legend()
+            current_axes.legend()
+
+            ax_single.set_xlabel('Time Steps')
+            current_axes.set_xlabel('Time Steps')
+
+            ax_single.set_ylabel('Amplitude [mV]')
+            current_axes.set_ylabel('Amplitude [mV]')
+
+            ax_single.set_title('Filtered Signal Sample')
+
+            if self.Zoom:
+
+                axins = ax_single.inset_axes([0.05, 0.5, 0.4, 0.4])
+
+                if state != None:
+                    axins.plot(t, state, color='g')
+
+                for i, (result, label) in enumerate(zip(results, labels)):
+                    color = (max(0, i - 1) * 0.5 ** (i - 2), max(0, i) * 0.5 ** (i - 1), max(0, i + 1) * 0.5 ** i)
+
+                    axins.plot(t, result[j,...,channel].squeeze(), label=label, color=color)
+
                 axins.get_xaxis().set_visible(False)
                 axins.get_yaxis().set_visible(False)
 
-                x1, x2, y1, y2 = int(0.4*360), int(0.6*360), torch.min(torch.min(test_target[random_sample_index, :, random_channel].detach().cpu()), torch.min(predictions[random_sample_index, :, random_channel].detach().cpu())).item(), \
-                                 torch.max(torch.max(test_target[random_sample_index, :, random_channel].detach().cpu()), torch.max(predictions[random_sample_index, :, random_channel].detach().cpu())).item()
+                x1, x2, y1, y2 = 0.4, 0.6, ax_single.dataLim.intervaly[0], ax_single.dataLim.intervaly[1]
                 axins.set_xlim(x1, x2)
                 axins.set_ylim(y1, y2)
                 axins.set_xticklabels([])
                 axins.set_yticklabels([])
                 axins.grid()
 
-                ax.indicate_inset_zoom(axins, edgecolor="black")
-            segment = 'segment_' + kwargs['segment'] if 'segment' in kwargs.keys() else ''
-            plt.savefig(self.Logger.GetLocalSaveName('SamplePlots', prefix=f'{i}_{segment}'))
+                ax_single.indicate_inset_zoom(axins, edgecolor="black")
 
+            fig_single.savefig(self.Logger.GetLocalSaveName('Sample_Plots', prefix=f'{prefix}Single_{j}_'))
             if self.wandb:
-                wandb.log({'chart': plt})
-                plt.clf()
-
+                wandb.log({'chart': fig_single})
             else:
-                plt.show()
+                fig_single.show()
+
+        for n, (multi_fig, _) in enumerate(multi_figures):
+            multi_fig.savefig(self.Logger.GetLocalSaveName('Sample_Plots', prefix=f'{prefix}Multi_{n}_'))
+
+        if self.wandb:
+            wandb.log({'chart': fig_multi})
+        else:
+            fig_multi.show()
+
+        # Plot multiple HBs
+
+        consecutive_beats = min(7, samples)
+
+        StackedObservations = Stich(observations[-consecutive_beats:], self.Overlaps[-consecutive_beats:])
+
+        if stateFlag:
+            StackedStates = Stich(states[-consecutive_beats:], self.Overlaps[-consecutive_beats:])
+
+        Stackedresults = []
+        for result in results:
+            Stackedresults.append(Stich(result[-consecutive_beats:], self.Overlaps[-consecutive_beats:]))
+
+        t_cons = np.arange(start=0, stop=consecutive_beats, step=consecutive_beats / len(StackedObservations))
+
+        num_signal = 2 if stateFlag else 1
+
+        fig_con, ax_cons = plt.subplots(nrows=num_signal + len(Stackedresults), ncols=1, figsize=(16, 9), dpi=120)
+        fig_con.set_tight_layout(True)
+
+        ax_cons[0].plot(t_cons, StackedObservations[...,channel].squeeze(), label='Observations', color='r', alpha=0.4)
+
+        ax_cons[0].set_xlabel('Time [s]')
+        ax_cons[0].set_ylabel('Amplitude [mV]')
+        title_cons = 'Observations'
+        ax_cons[0].set_title(title_cons)
+
+        if stateFlag:
+            ax_cons[1].plot(t_cons, StackedStates[...,channel].squeeze(), label='Ground Truth', color='g')
+
+            ax_cons[1].set_xlabel('Time [s]')
+            ax_cons[1].set_ylabel('Amplitude [mV]')
+            title_cons = 'Ground Truth'
+            ax_cons[1].set_title(title_cons)
+
+        for j, (result, label) in enumerate(zip(Stackedresults, labels)):
+            color = (max(0, j - 1) * 0.5 ** (j - 2), max(0, j) * 0.5 ** (j - 1), max(0, j + 1) * 0.5 ** j)
+            ax_cons[j + num_signal].plot(t_cons, result[...,channel].squeeze(), color=color)
+            ax_cons[j + num_signal].set_title(label)
+            ax_cons[j + num_signal].set_xlabel('Time [s]')
+            ax_cons[j + num_signal].set_ylabel('Amplitude [mV]')
+
+        fig_con.savefig(self.Logger.GetLocalSaveName('Sample_Plots', prefix=f'{prefix}Cons_'))
+        fig_con.show()
+        1
 
     def setModel(self, model):
 
-        self.model = model
-        parameters = {'LatentSpace': model.latent_space_dim,
-                      'NumChannels': model.num_channels}
+            self.model = model
+            parameters = {'LatentSpace': model.latent_space_dim,
+                          'NumChannels': model.num_channels}
 
-        self.Logger.SaveConfig(parameters)
+            self.Logger.SaveConfig(parameters)
 
     def TestWhole(self, Test_Dataset, Networks,**kwargs):
 

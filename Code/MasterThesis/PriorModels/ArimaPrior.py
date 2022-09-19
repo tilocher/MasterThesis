@@ -1,18 +1,43 @@
+import matplotlib.pyplot as plt
+
 from PriorModels.BasePrior import BasePrior
 from statsmodels.tsa.arima.model import ARIMA
 
-class ArmaPrior(BasePrior):
+class ArimaPrior(BasePrior):
 
-    def __init__(self,order = (1,1,1)):
+    def __init__(self,**kwargs):
 
-        super(ArmaPrior, self).__init__()
+        super(ArimaPrior, self).__init__()
 
-        self.order = order
+        self.order = kwargs['order'] if 'order' in kwargs.keys() else (5,0,0)
 
     def fit(self,data):
 
-        model = ARIMA(data, order=self.order)
-        self.model = model.fit()
+        sample,self.channels, self.T = data.shape
+        data = data[0]
+
+
+        self.models = []
+
+        for channel in range(self.channels):
+
+            model = ARIMA(data[channel].numpy(), order=self.order)
+            result = model.fit(method='yule_walker')
+            self.models.append(result)
+
+
+
+        1
+
+    # def f(self,x,t):
+
+
+
+
+
+    # def getSysModel(self):
+
+
 
 
 

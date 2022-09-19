@@ -7,8 +7,9 @@ from NNs.AutoEncoder import AutoEncoder
 from Pipelines.AutoEncoder_Pipeline import ECG_AE_Pipeline
 import copy
 import numpy as np
+from utils import GetSubset
 
-
+from DataLoaders.RikLoader import RikDataset
 
 
 if __name__ == '__main__':
@@ -34,21 +35,29 @@ if __name__ == '__main__':
 
     Segmented = config['Segmented']
 
-    loader = PhyioNetLoader_MIT_NIH(num_sets= 4, num_beats= 1,
-                                    num_samples= signal_length, SNR_dB= snr, gpu= gpu,
-                                    desired_shape= (1, signal_length, 2), roll= roll)
+    # loader = PhyioNetLoader_MIT_NIH(num_sets= 20, num_beats= 1,
+    #                                 num_samples= signal_length, SNR_dB= snr, gpu= gpu,
+    #                                 desired_shape= (1, signal_length, 2), roll= roll)
+
+    signal_length_ratio = 0.5
+    loader = RikDataset(num_files=130,desired_shape=(1, int(signal_length_ratio * 500), 12), gpu=config['gpu'],
+                        preprocess=config['preprocess'], snr_dB=snr, offset=1, signal_length_ratio=signal_length_ratio)
 
     if Segmented:
         loader.SplitToSegments()
 
-    N_train = int(0.8 * len(loader))
+    N_train = int(0.99 * len(loader))
     # N_train = 32
     N_test = len(loader) - N_train
     dev = torch.device('cuda:0' if torch.cuda.is_available() and loader.gpu else 'cpu')
 
     torch.random.manual_seed(42)
-    Train_Loader, Test_Loader = torch.utils.data.random_split(loader, [N_train, N_test],
-                                                              generator=torch.Generator())
+
+
+    Train_Loader,Test_Loader = GetSubset(loader, N_train)
+
+    # Train_Loader, Test_Loader = torch.utils.data.random_split(loader, [N_train, N_test],
+    #                                                           generator=torch.Generator())
 
     # Test_Loader,_ = torch.utils.data.random_split(Test_Loader, [10, len(Test_Loader)-10],
     #                                                           generator=torch.Generator())
@@ -74,7 +83,7 @@ if __name__ == '__main__':
 
     for i in range(num_segments):
 
-        nnModel = AutoEncoder(num_channels=2,
+        nnModel = AutoEncoder(num_channels=12,
                               signal_length=signal_length,
                               conv_filters=(40, 20, 20, 20, 20, 40),
                               conv_kernels=((40, 2), (40, 2), (40, 2), (40, 2), (40, 2), (40, 2)),
@@ -97,4 +106,4 @@ if __name__ == '__main__':
 
         Pipelines.append(ECG_Pipeline)
 
-    ECG_Pipeline.TestWhole(Test_Loader,models)
+    # ECG_Pipeline.TestWhole(Test_Loader,models)

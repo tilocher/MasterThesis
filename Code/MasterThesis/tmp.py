@@ -10,16 +10,16 @@ if __name__ == '__main__':
     # fig.set_size_inches(10, )
     markersize = 20
 
-    loader = PhyioNetLoader_MIT_NIH(1,2,650,0,gpu=False,plot_sample=False)
+    loader = PhyioNetLoader_MIT_NIH(1,1,360,0,gpu=False,plot_sample=False)
 
-    sample = loader[7]
+    sample = loader.centerd_data[0]
     # t = np.arange(start=0, stop=sample_signal.shape[0] / (self.fs), step=1 / (self.fs))
 
     # ax = plt.Axes(fig, [0., 0., 1., 1.])
 
     # ax = plt.axes(projection = '3d')
     ax = plt.axes()
-    # ax.set_axis_off()
+    ax.set_axis_off()
     fig.add_axes(ax)
     # plt.plot(0,1,'*',color = '#FF3333',markersize = markersize)
     # plt.plot(-0.1, 0.5, '*', color='#CC99FF',markersize = markersize)
@@ -29,26 +29,28 @@ if __name__ == '__main__':
     # plt.xlim([-0.4,0.4])
 
 
-    y = torch.linspace(0,1,sample[1].T[:,0].shape[0])
+    y = torch.linspace(0,1,sample.shape[-1])
     x = torch.zeros_like(y)
+
+    plt.plot(y,sample[0])
 
     # x = np.sin(t)
     # y = np.cos(t)
 
     # ax.view_init(-20,-70)
 
-    torch.random.manual_seed(69)
-
-    noise = 0.04*torch.randn(size=sample[1].T[:,0].shape)
-    jump = 4
-
-    plt.plot(sample[1].T[::jump,0] + noise[::jump],'o--',color='#1e76b4')
+    # torch.random.manual_seed(69)
+    #
+    # noise = 0.04*torch.randn(size=sample[1].T[:,0].shape)
+    # jump = 4
+    #
+    # plt.plot(sample[1].T[::jump,0] + noise[::jump],'o--',color='#1e76b4')
     # ax.plot3D(x,y,sample[1].T[:,0])
     # plt.axis([0,1,0.3,0.9])
 
-    plt.xlabel('Time [s]')
-    plt.ylabel('Amplitude [V]')
-    plt.savefig('beat_sideways.svg',transparent = True)
+    # plt.xlabel('Time [s]')
+    # plt.ylabel('Amplitude [V]')
+    plt.savefig('one_beat.svg',transparent = True)
 
     plt.show()
     def conv(x):
@@ -68,7 +70,7 @@ if __name__ == '__main__':
     ####################################################################################################################
     ####################################################################################################################
 
-    # #
+    #
     # a = pandas.read_csv(r"C:\Users\Timur\Downloads\wandb_export_2022-07-19T18_48_36.202+02_00.csv",delimiter=',')
     # a = a.values[:,1:3]
     # perm = []
@@ -97,8 +99,8 @@ if __name__ == '__main__':
     # plt.ylabel('MSE Loss [dB]')
     # plt.title('MSE loss for different SNRs for different models')
     # # plt.savefig('EM_losses_plot_taylor_em.pdf')
-    #
-    #
+
+
     # plt.show()
 
     ####################################################################################################################

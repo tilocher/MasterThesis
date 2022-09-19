@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from time import gmtime, strftime
-from scipy.signal import butter, lfilter
+from scipy.signal import butter, lfilter,filtfilt
 
 LOG_DIR = "logs/"
 PLOT_DIR = "plots/"
@@ -66,13 +66,13 @@ class QRSDetectorOffline(object):
         :param bool plot_data: flag for plotting the results to a file
         :param bool show_plot: flag for showing generated results plot - will not show anything if plot is not generated
         """
-        multiplier = 4
+        multiplier = 2
 
         self.signal_frequency = 250 * multiplier  # Set ECG device frequency in samples per second here.
 
         self.filter_lowcut = 0.1
         self.filter_highcut = 15.0
-        self.filter_order = 1
+        self.filter_order = 6
 
         self.integration_window = 15 * multiplier # Change proportionally when adjusting frequency (in samples).
 
@@ -266,9 +266,12 @@ class QRSDetectorOffline(object):
         """
         nyquist_freq = 0.5 * signal_freq
         low = lowcut / nyquist_freq
+        low = 2
         high = highcut / nyquist_freq
-        b, a = butter(filter_order, [low, high], btype="band")
-        y = lfilter(b, a, data)
+
+        b,a = butter(filter_order, 2,btype='highpass',fs=self.signal_frequency)
+        # b, a = butter(filter_order, [low, high], btype="band")
+        y = filtfilt(b, a, data)
         return y
 
     def findpeaks(self, data, spacing=1, limit=None):
