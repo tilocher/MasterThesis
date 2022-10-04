@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.optimize
 from numpy import pi
 import torch
 from tqdm import trange
@@ -13,7 +14,8 @@ def DiagBMM(X: torch.Tensor, Y: torch.Tensor):
 
 class KalmanFilter():
 
-    def __init__(self, sysModel: SystemModel, em_vars:list=['R'], em_averages:list =['R'], DiagonalMatrices:list = []):
+    def __init__(self, sysModel: SystemModel, em_vars:list=['R'], em_averages:list =[], DiagonalMatrices:list = [],
+                 nResiduals = 1):
         self.ssModel = sysModel
 
         self.m = sysModel.m
@@ -32,6 +34,8 @@ class KalmanFilter():
 
         self.em_vars = em_vars if not em_vars == 'all' else self.AllVars + ['Mu']
         self.em_averages = list(set(em_vars).intersection(em_averages))
+
+        self.nResiduals = nResiduals
 
         self.OnlyPrior = False
 
@@ -138,6 +142,8 @@ class KalmanFilter():
         if len(self.Initial_State_Covariance.shape) == 2:
             self.Initial_State_Covariance = self.Initial_State_Covariance.unsqueeze(0)
 
+        self.Initial_Observation_Covariance = self.Initial_State_Covariance
+
     def UpdateJacobians(self, t):
 
         # Update Gradients
@@ -223,6 +229,7 @@ class KalmanFilter():
             self.Predicted_State_Covariances = torch.empty((self.BatchSize, T, self.m, self.m))
             self.Predicted_Observation_Means = torch.empty((self.BatchSize, T, self.n, 1))
             self.Predicted_Observation_Covariances = torch.empty((self.BatchSize, T, self.n, self.n))
+            self.Predicted_Residuals = torch.empty((self.BatchSize, T, self.n, 1))
             self.Filtered_Residuals = torch.empty((self.BatchSize, T, self.n, 1))
 
             self.F_arr = torch.empty((self.BatchSize, T, self.m, self.m))
@@ -231,6 +238,7 @@ class KalmanFilter():
             # Initialize Parameters
             self.Filtered_State_Mean = self.Initial_State_Mean
             self.Filtered_State_Covariance = self.Initial_State_Covariance
+
 
             for t in range(T):
                 self.predict(t)
@@ -247,6 +255,7 @@ class KalmanFilter():
                 self.Predicted_State_Covariances[:, t] = self.Predicted_State_Covariance
                 self.Predicted_Observation_Means[:, t] = self.Predicted_Observation_Mean
                 self.Predicted_Observation_Covariances[:, t] = self.Predicted_Observation_Covariance
+                self.Predicted_Residuals[:,t] = self.Predicted_Residual
                 self.Filtered_Residuals[:, t] = self.Filtered_Residual
                 self.F_arr[:, t] = self.F
                 self.H_arr[:, t] = self.H
@@ -260,6 +269,7 @@ class KalmanFilter():
 
         self.Filtered_State_Mean = self.Initial_State_Mean
         self.Filtered_State_Covariance = self.Initial_State_Covariance
+        self.Predicted_Observation_Covariance = self.Initial_Observation_Covariance
 
         # Initialize sequences
         self.Filtered_State_Means = torch.empty((self.BatchSize, T, self.m, 1))
@@ -269,6 +279,7 @@ class KalmanFilter():
         self.Predicted_State_Covariances = torch.empty((self.BatchSize, T, self.m, self.m))
         self.Predicted_Observation_Means = torch.empty((self.BatchSize, T, self.n, 1))
         self.Predicted_Observation_Covariances = torch.empty((self.BatchSize, T, self.n, self.n))
+        self.Predicted_Residuals = torch.zeros((self.BatchSize, T, self.n, 1))
         self.Filtered_Residuals = torch.empty((self.BatchSize, T, self.n, 1))
 
         self.F_arr = torch.empty((self.BatchSize, T, self.m, self.m))
@@ -292,6 +303,7 @@ class KalmanFilter():
         self.Predicted_State_Covariances[:, self.t] = self.Predicted_State_Covariance
         self.Predicted_Observation_Means[:, self.t] = self.Predicted_Observation_Mean
         self.Predicted_Observation_Covariances[:, self.t] = self.Predicted_Observation_Covariance
+        self.Predicted_Residuals[:,self.t] = self.Predicted_Residual
         self.Filtered_Residuals[:, self.t] = self.Filtered_Residual
         self.F_arr[:, self.t] = self.F
         self.H_arr[:, self.t] = self.H
@@ -300,12 +312,59 @@ class KalmanFilter():
 
     def UpdateRik(self,observation):
 
-        rho = observation - self.Filtered_State_Mean
+        rho = self.Predicted_Residuals[:,self.t - max(self.nResiduals,0):self.t]
+
+        rhoNew = (observation - self.Filtered_State_Mean).unsqueeze(0)
+
+        rho = torch.cat((rho,rhoNew),dim= 1).mean(1)
+        m = self.m
+        # r_2 = torch.diag(self.R).mean()
+        # sigma_2 = torch.diag(self.Filtered_State_Covariance.squeeze()).mean()
+
+        lambda_hat = torch.zeros(self.m)
+
+        for i in range(self.m):
+            lambda_hat[i] = rho[0,i,0]**2 - self.R[i,i] - self.Filtered_State_Covariance[0,i,i]
+
+
+        r_2 = torch.diag(self.R)
+        sigma_2 = torch.diag(self.Filtered_State_Covariance.squeeze())
         # lambda_hat_2 = max(1/self.m * torch.bmm(rho.mT,rho) - torch.mean(torch.diag(self.R)) - torch.mean(torch.diag(self.Filtered_State_Covariance.squeeze())),0)
         lambda_hat_2 = torch.clip(1 / self.m * torch.bmm(rho.mT, rho).squeeze() - torch.diag(self.R) - torch.diag(
-            self.Filtered_State_Covariance.squeeze()),1e-3)
-        # self.UpdateQ(torch.diag(lambda_hat_2))
-        self.UpdateQ(lambda_hat_2 * torch.eye(self.m))
+            self.Filtered_State_Covariance.squeeze()),1e-4)
+
+        # lambda_hat_2 = torch.clip(rho*rho - torch.diag(self.R) - torch.diag(
+        #     self.Filtered_State_Covariance.squeeze()), 0)
+
+        # lambda_hat_2 = torch.clip(1/self.m* torch.bmm(rho.mT,rho) - torch.diag(self.R).mean() - torch.diag(
+        #     self.Filtered_State_Covariance.squeeze()).mean(), 0)
+
+
+        # lambda_hat_2 = torch.clip(torch.bmm(rho.mT, rho).squeeze() - torch.diag(self.R) - torch.diag(
+        #     self.Filtered_State_Covariance.squeeze()), 1e-3)
+
+
+        # def likelihood(lam_2):
+        #
+        #
+        #     covar = (r_2 + sigma_2 + lam_2)*torch.eye(m).unsqueeze(0)
+        #     # covar_inv = torch.linalg.pinv(covar)
+        #     covar_inv = 1/(r_2+sigma_2+lam_2) * torch.eye(m).unsqueeze(0)
+        #
+        #     mat = torch.bmm(rho.mT, covar_inv**2)
+        #     mat = torch.bmm(mat, rho)
+        #
+        #     ret = 0.5*mat - 0.5 * torch.trace(covar_inv.squeeze())
+        #
+        #     return ret.item()
+        #
+        # scipy_out = scipy.optimize.minimize_scalar(likelihood,bounds= (0,100),method='bounded')
+        # lambda_hat_2 = scipy.optimize.minimize(likelihood,bounds= (0,100),method='bounded')
+
+        # normalized_weighting = torch.nn.functional.normalize(lambda_hat_2**2)
+
+
+        self.UpdateQ(torch.clip(lambda_hat,0) * torch.eye(self.m))
 
     @torch.no_grad()
     def LogLikelihood(self, Observations, T):
@@ -329,7 +388,7 @@ class KalmanFilter():
 
 class KalmanSmoother(KalmanFilter):
 
-    def __init__(self, ssModel, em_vars=['R','Q'], em_averages=['R'], DiagonalMatrices = []):
+    def __init__(self, ssModel, em_vars=['R','Q'], em_averages=[], DiagonalMatrices = []):
 
         super(KalmanSmoother, self).__init__(ssModel, em_vars, em_averages, DiagonalMatrices)
 
@@ -357,6 +416,8 @@ class KalmanSmoother(KalmanFilter):
                                                        self.SG.mT))
 
     def smooth(self, observations, T):
+        import time
+        start = time.time_ns()
 
         self.filter(observations, T)
 
@@ -382,6 +443,10 @@ class KalmanSmoother(KalmanFilter):
             self.Smoothed_State_Means[:, t] = self.Smoothed_State_Mean
             self.Smoothed_State_Covariances[:, t] = self.Smoothed_State_Covariance
             self.SGains[:, t] = self.SG
+
+        stop = time.time_ns()
+        print('dsf')
+
 
     def SmoothPair(self, T):
 
@@ -458,6 +523,40 @@ class KalmanSmoother(KalmanFilter):
             if states != None:
                 return torch.tensor(losses)
 
+    def emOnline(self,observations,T, smoothing_window_Q = -1, smoothing_window_R = -1):
+
+        observations = observations.reshape(1,-1,self.m,1)
+
+        self.SmoothPair(T)
+
+        self.U_xx = torch.einsum('BTmp,BTpn->BTmn', (self.Smoothed_State_Means, self.Smoothed_State_Means.mT))
+        self.U_xx += self.Smoothed_State_Covariances
+
+        self.U_yx = torch.einsum('BTnp,BTpm->BTnm', (observations, self.Smoothed_State_Means.mT))
+
+        self.U_yy = torch.einsum('BTmp,BTpn->BTmn', (observations, self.Observations.mT))
+
+        self.V_xx = self.U_xx[:, :-1]
+
+        self.V_x1x = torch.einsum('BTmp,BTpn->BTmn',
+                                  (self.Smoothed_State_Means[:, 1:], self.Smoothed_State_Means[:, :-1].mT))
+        self.V_x1x += self.Pariwise_Covariances[:, 1:]
+
+        self.V_x1x1 = self.U_xx[:, 1:]
+
+        for EmVar in self.em_vars:
+
+            if EmVar == 'Q':
+                self.EM_Update_Q(smoothing_window_Q)
+
+            elif EmVar == 'R':
+                self.EM_Update_R(smoothing_window_R)
+
+            else:
+                self.__getattribute__(f'EM_Update_{EmVar}')()
+
+        self.Average_EM_vars()
+
     def EM_Update_H(self):
 
         H_arr = torch.einsum('Bmp,Bpn->Bmn', (self.U_yx.mean(1), torch.linalg.pinv(self.U_xx.mean(1))))
@@ -512,9 +611,9 @@ class KalmanSmoother(KalmanFilter):
 
             U_yy = moving_average(self.U_yy, window_size=smoothing_window)
 
-            HU_xy = torch.einsum('Bmp,Bpn->Bmn', (self.H_arr, U_yx.mT))
+            HU_xy = torch.einsum('Bmp,BTpn->BTmn', (self.H_arr, U_yx.mT))
 
-            R_arr = U_yy - HU_xy - HU_xy.mT + torch.einsum('Bmp,Bpk,Bkn->Bmn',
+            R_arr = U_yy - HU_xy - HU_xy.mT + torch.einsum('Bmp,BTpk,Bkn->BTmn',
                                                            (self.H_arr, U_xx, self.H_arr.mT))
 
             R_arr = R_arr.repeat(1, self.ssModel.T, 1, 1)
@@ -591,6 +690,7 @@ class KalmanSmoother(KalmanFilter):
 
 
     def Average_EM_vars(self):
+        # pass
 
         for value in self.em_averages:
             self.__setattr__(f'{value}_arr', self.__getattribute__(f'{value}_arr').mean(1))

@@ -13,7 +13,8 @@ from ecgdetectors import Detectors
 
 class RikDataset(Dataset):
 
-    def __init__(self,desired_shape, signal_length_ratio = 0.7, num_files = 1, gpu = False, snr_dB = 0, preprocess = False, offset = 0 ):
+    def __init__(self,desired_shape, signal_length_ratio = 0.7, num_files = 1, gpu = False, snr_dB = 0, preprocess = False, offset = 0,
+                 noiseColor = 0):
         super(RikDataset, self).__init__()
 
         self.file_location = os.path.dirname(os.path.realpath(__file__))
@@ -23,6 +24,7 @@ class RikDataset(Dataset):
         self.num_samples = self.T = int(self.fs * signal_length_ratio)
         self.preprocessed = preprocess
         self.num_channels = 12
+        self.noiseColor = noiseColor
 
         self.channels = self.m = self.n = 12
 
@@ -33,6 +35,7 @@ class RikDataset(Dataset):
         self.noise = []
         self.dataset = []
         self.labels = []
+        self.labels_noiseless = []
 
         detectors = Detectors(self.fs)
 
@@ -49,21 +52,39 @@ class RikDataset(Dataset):
         for mat_file in mat_files[offset:num_files+offset]:
             raw_data = loadmat(mat_file)['ECG']
 
-            raw_data = torch.from_numpy(raw_data)
+            raw_data = torch.from_numpy(raw_data[:,:8000])
             peak_detection_data = raw_data[0]
-            labels = detectors.wqrs_detector(peak_detection_data.numpy())
+            labels = detectors.wqrs_detector(peak_detection_data.numpy()[:])
+            # self.dataset.append(torch.tensor(raw_data.clone().detach()[:,:8000], dtype=torch.float32))
+            self.dataset.append(torch.tensor(raw_data.clone().detach()[:], dtype=torch.float32))
+            self.labels_noiseless.append(labels)
 
-            self.dataset.append(torch.tensor(raw_data.clone().detach()[:,:8000], dtype=torch.float32))
-            self.labels.append(labels)
+
 
         self.dataset = torch.stack(self.dataset)
 
+        self.AddGaussianNoise(snr_dB)
 
         if preprocess:
             self.preprocess()
 
+
+        for noisy_obs in self.noisy_dataset_prepro:
+
+            y = noisy_obs.mean(0).cpu()
+            y = y.reshape(-1, 1)
+            non_sense = np.zeros_like(y)
+            signal = np.concatenate((non_sense, y), axis=-1)
+            qrs_detector = QRSDetectorOffline(signal, False, False, False, False)
+            labels = scipy.signal.find_peaks(qrs_detector.squared_ecg_measurements,
+                                    distance=200)[:1]
+            # labels = detectors.wqrs_detector(noisy_obs.numpy().mean(0))
+
+            self.labels.append(labels[0])
+
+
+
         self.Center()
-        self.AddGaussianNoise(snr_dB)
 
 
         if desired_shape != None:
@@ -81,7 +102,7 @@ class RikDataset(Dataset):
             self.centerd_data = intermediate.permute(permutation)
             self.noisy_dataset = intermediate_noisy.permute(permutation)
 
-        1
+
 
     def preprocess(self):
         # Keep unprocessed data
@@ -93,11 +114,14 @@ class RikDataset(Dataset):
 
         normal_cutoff = cutoff / nyq
         f1 = 0.5 / self.fs
-        f2 = 90/ self.fs
+        f2 = 90 / self.fs
+        # f2 = 70 / self.fs
+
 
         b, a = signal.butter(order, [f1 * 2, f2 * 2], btype='bandpass')
-        self.dataset = torch.tensor(signal.lfilter(b, a, self.dataset),dtype= torch.float32)
-        self.noisy_dataset = torch.tensor(signal.lfilter(b, a, self.noisy_dataset),dtype = torch.float32)
+        self.dataset_prepro = torch.tensor(signal.filtfilt(b, a, self.dataset.cpu()).copy(),dtype= torch.float32,device=self.dev)
+        self.noisy_dataset_prepro = torch.tensor(signal.filtfilt(b, a, self.noisy_dataset.cpu()).copy(),dtype = torch.float32, device= self.dev)
+
 
 
 
@@ -137,92 +161,58 @@ class RikDataset(Dataset):
         :return:
         """
 
-        signals = self.centerd_data
+        # signals = self.centerd_data
+        signals = self.dataset
         signal_power_dB = 10 * torch.log10(signals.var(-1) + signals.mean(-1) ** 2)
 
         noise_power_dB = signal_power_dB - SNR_dB
         noise_power = 10 ** (noise_power_dB / 20).unsqueeze(-1)
 
         noise = torch.normal(torch.zeros_like(signals), noise_power.repeat(1, 1, signals.shape[-1]))
+
+        import colorednoise as cn
+
+        beta = self.noiseColor        # the exponent: 0=white noite; 1=pink noise;  2=red noise (also "brownian noise")
+        samples = len(signals)  # number of samples to generate (time series extension)
+        #Deffing some colores
+        noise_color = [torch.from_numpy(cn.powerlaw_psd_gaussian(beta, signals.shape[-1])) for _ in range(signals.shape[1])]
+        noise_color = torch.stack(noise_color).float()
+
+        noise_color = noise_color * noise_power
+
+        # noise = noise + noise_color
+        noise = noise_color
+
+        # f = np.fft.rfftfreq(len(noise_color[0]))
+        # g = np.fft.rfftfreq(len(noise[0,1]))
+        # plt.loglog(f, np.abs(np.fft.rfft(noise_color[0])))
+        # plt.loglog(g, np.abs(np.fft.rfft(noise[0,1])))
+        # plt.show()
+
+
+
         noise_power_num = 10 * np.log10(noise.var(-1) + noise.mean(-1) ** 2)
         print('SNR of actual signal', round((signal_power_dB - noise_power_num).mean().item(), 3), '[dB]')
 
         noisy_sample = signals + noise
 
         noisy_sample = noisy_sample.to(self.dev)
-        self.centerd_data = self.centerd_data.to(self.dev)
+        # self.centerd_data = self.centerd_data.to(self.dev)
+        # self.dataset = signals
 
         self.noisy_dataset = noisy_sample
 
 
 
-    # def Center(self):
-    #     full_data = []
-    #     full_data_noisy = []
-    #     for j,label in enumerate(self.labels):
-    #
-    #         beat_indices_last = label[self.num_beats-1::self.num_beats]
-    #         beat_indices_first = label[0::self.num_beats]
-    #         intermediate = []
-    #         intermediate_noisy = []
-    #
-    #
-    #         last_index = 0
-    #         num_waveforms = 0
-    #         end_index = 0
-    #
-    #         self.num_pad = []
-    #         self.Overlap = []
-    #
-    #         for i, index in enumerate(beat_indices_last):
-    #
-    #             if self.num_beats == 1:
-    #                 middle = int(last_index + int((index - last_index)/1))
-    #             else:
-    #                 middle = int( last_index + (index - beat_indices_first[i]) / 2)
-    #
-    #             lower_index = middle - int(self.num_samples/2)
-    #             upper_index = middle + int(self.num_samples/2)
-    #
-    #             if lower_index >= 0 and upper_index < self.dataset.shape[-1]:
-    #
-    #                 if self.num_samples > self.fs*self.num_beats:
-    #                     num_pad = int((self.num_samples-self.fs)/2)
-    #                     self.num_pad.append([num_pad,num_pad])
-    #                     data = torch.nn.functional.pad(self.dataset[j,:,int(index)-int(self.fs/2):int(index) + int(self.fs/2)], (num_pad,num_pad),'replicate')
-    #                     intermediate.append(data)
-    #
-    #                 else:
-    #                     intermediate.append(self.dataset[j,:,lower_index:upper_index])
-    #                     intermediate_noisy.append(self.noisy_dataset[j,:,lower_index:upper_index])
-    #
-    #                     self.Overlap.append(max(end_index-lower_index, 0))
-    #
-    #                 num_waveforms+=1
-    #             last_index = index
-    #             end_index = upper_index
-    #
-    #         centered_data  = torch.stack(intermediate,dim=0)
-    #         centered_data_noisy = torch.stack(intermediate_noisy,dim=0)
-    #         permutation = [centered_data.shape.index(x) for x in (num_waveforms,self.channels,self.num_samples)]
-    #         centered_data  = centered_data.permute(permutation)
-    #         centered_data_noisy = centered_data_noisy.permute(permutation)
-    #
-    #         full_data.append(centered_data)
-    #         full_data_noisy.append(centered_data_noisy)
-    #
-    #     self.centerd_data =  torch.cat(full_data,dim=0).to(self.dev)
-    #     self.noisy_dataset = torch.cat(full_data_noisy,dim = 0).to(self.dev)
-    #
-    #     return self.centerd_data , self.noisy_dataset
-
     def Center(self):
         full_data = []
+        full_data_noisy = []
         for j,label in enumerate(self.labels):
 
             beat_indices_last = label[self.num_beats-1::self.num_beats]
             beat_indices_first = label[0::self.num_beats]
             intermediate = []
+            intermediate_noisy = []
 
 
             last_index = 0
@@ -252,20 +242,78 @@ class RikDataset(Dataset):
 
                     else:
                         intermediate.append(self.dataset[j,:,lower_index:upper_index])
+                        intermediate_noisy.append(self.noisy_dataset[j,:,lower_index:upper_index])
+
                         self.Overlap.append(max(end_index-lower_index, 0))
 
                     num_waveforms+=1
                 last_index = index
                 end_index = upper_index
 
-            centered_data  = torch.stack(intermediate,dim=1)
-            permutation = [centered_data.shape.index(x) for x in (num_waveforms,self.num_channels,self.num_samples)]
+            centered_data  = torch.stack(intermediate,dim=0)
+            centered_data_noisy = torch.stack(intermediate_noisy,dim=0)
+            permutation = [centered_data.shape.index(x) for x in (num_waveforms,self.channels,self.num_samples)]
             centered_data  = centered_data.permute(permutation)
+            centered_data_noisy = centered_data_noisy.permute(permutation)
 
             full_data.append(centered_data)
+            full_data_noisy.append(centered_data_noisy)
 
-        full_data = self.centerd_data =  torch.cat(full_data,dim=0)
-        return full_data
+        self.centerd_data =  torch.cat(full_data,dim=0).to(self.dev)
+        self.noisy_dataset = torch.cat(full_data_noisy,dim = 0).to(self.dev)
+
+        return self.centerd_data , self.noisy_dataset
+
+    # def Center(self):
+    #     full_data = []
+    #     for j,label in enumerate(self.labels):
+    #
+    #         beat_indices_last = label[self.num_beats-1::self.num_beats]
+    #         beat_indices_first = label[0::self.num_beats]
+    #         intermediate = []
+    #
+    #
+    #         last_index = 0
+    #         num_waveforms = 0
+    #         end_index = 0
+    #
+    #         self.num_pad = []
+    #         self.Overlap = []
+    #
+    #         for i, index in enumerate(beat_indices_last):
+    #
+    #             if self.num_beats == 1:
+    #                 middle = int(last_index + int((index - last_index)/1))
+    #             else:
+    #                 middle = int( last_index + (index - beat_indices_first[i]) / 2)
+    #
+    #             lower_index = middle - int(self.num_samples/2)
+    #             upper_index = middle + int(self.num_samples/2)
+    #
+    #             if lower_index >= 0 and upper_index < self.dataset.shape[-1]:
+    #
+    #                 if self.num_samples > self.fs*self.num_beats:
+    #                     num_pad = int((self.num_samples-self.fs)/2)
+    #                     self.num_pad.append([num_pad,num_pad])
+    #                     data = torch.nn.functional.pad(self.dataset[j,:,int(index)-int(self.fs/2):int(index) + int(self.fs/2)], (num_pad,num_pad),'replicate')
+    #                     intermediate.append(data)
+    #
+    #                 else:
+    #                     intermediate.append(self.dataset[j,:,lower_index:upper_index])
+    #                     self.Overlap.append(max(end_index-lower_index, 0))
+    #
+    #                 num_waveforms+=1
+    #             last_index = index
+    #             end_index = upper_index
+    #
+    #         centered_data  = torch.stack(intermediate,dim=1)
+    #         permutation = [centered_data.shape.index(x) for x in (num_waveforms,self.num_channels,self.num_samples)]
+    #         centered_data  = centered_data.permute(permutation)
+    #
+    #         full_data.append(centered_data)
+    #
+    #     full_data = self.centerd_data =  torch.cat(full_data,dim=0)
+    #     return full_data
 
     def __getitem__(self, item):
 

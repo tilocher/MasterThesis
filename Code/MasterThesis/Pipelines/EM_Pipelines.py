@@ -1,3 +1,5 @@
+import time
+
 import librosa.core
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -11,7 +13,6 @@ import numpy as np
 import torch
 from Filters.KalmanSmoother import KalmanSmoother, KalmanFilter
 from utils import Stich
-import torchlibrosa
 
 class EM_Pipeline(nn.Module):
 
@@ -64,7 +65,7 @@ class EM_Pipeline(nn.Module):
 
 
     def Run(self, Data: Dataset,PriorSamples:int = 100 , em_its:int = 10,
-            Num_Plot_Samples:int = 10,ConvergenceThreshold:float = 1e-5, EM_rep = None):
+            Num_Plot_Samples:int = 10,ConvergenceThreshold:float = 1e-5, EM_rep = None, **kwargs):
 
         try:
             with torch.no_grad():
@@ -85,9 +86,11 @@ class EM_Pipeline(nn.Module):
 
                 self.PlotPrior()
 
-                self.EM(TestDataset,em_its,Num_Plot_Samples, ConvergenceThreshold, EM_rep= EM_rep)
+                self.EM(TestDataset,em_its,Num_Plot_Samples, ConvergenceThreshold, EM_rep= EM_rep,**kwargs)
 
                 self.save()
+
+                # return self.comulativeLosses
 
         except:
             self.Logger.ForceClose()
@@ -122,14 +125,13 @@ class EM_Pipeline(nn.Module):
 
         self.ssModel.GenerateSequence(self.ssModel.T)
 
-        # for channel in self.ssModel.x:
-        #
-        #     plt.plot(channel)
-        #     plt.show()
+
+        # plt.plot(self.ssModel.x[0])
+        # plt.show()
 
 
 
-    def EM(self, Data: Dataset, em_its: int, Num_Plot_Samples: int, ConvergenceThreshold: float, EM_rep = None):
+    def EM(self, Data: Dataset, em_its: int, Num_Plot_Samples: int, ConvergenceThreshold: float, EM_rep = None,**kwargs):
 
 
         if self.Mode == 'All':
@@ -140,7 +142,7 @@ class EM_Pipeline(nn.Module):
                              ConvergenceThreshold=ConvergenceThreshold)
         elif self.Mode == 'Consecutive':
             self.ConsecutiveEM(TestSet=Data, em_its=em_its, Num_Plot_Samples=Num_Plot_Samples,
-                               ConvergenceThreshold=ConvergenceThreshold, EM_rep= EM_rep)
+                               ConvergenceThreshold=ConvergenceThreshold, EM_rep= EM_rep,**kwargs)
         else:
             raise ValueError(f'Mode {self.Mode} not supported')
 
@@ -148,7 +150,7 @@ class EM_Pipeline(nn.Module):
 
     def RegularEM(self, Data: Dataset, em_its:int , ConvergenceThreshold: float, Num_Plot_Samples: int):
 
-        self.EM_Data = Data
+        # self.EM_Data = Data
 
         self.Overlaps = Data.dataset.Overlap
 
@@ -201,11 +203,11 @@ class EM_Pipeline(nn.Module):
 
 
 
-    def ConsecutiveEM(self, TestSet, em_its,  Num_Plot_Samples, ConvergenceThreshold, EM_rep ):
+    def ConsecutiveEM(self, TestSet, em_its,  Num_Plot_Samples, ConvergenceThreshold, EM_rep ,**kwargs):
 
         self.Overlaps = TestSet.dataset.Overlap
 
-        self.EM_Data = TestSet
+        # self.EM_Data = TestSet
 
         channel = 0
 
@@ -219,13 +221,18 @@ class EM_Pipeline(nn.Module):
                 raise
 
         DataSet_length = len(TestSet)
+        nResiduals = kwargs['nResiduals'] if 'nResiduals' in kwargs.keys() else 1
+
+
 
         self.SmoothedResults = torch.empty((DataSet_length,self.ssModel.T,self.ssModel.m))
         self.SmoothedCovariances = torch.empty((DataSet_length,self.ssModel.T,self.ssModel.m,self.ssModel.m))
         self.FilteredResults = torch.empty((DataSet_length, self.ssModel.T, self.ssModel.m))
         self.FilteredCovariances = torch.empty((DataSet_length,self.ssModel.T,self.ssModel.m,self.ssModel.m))
+        self.comulativeLosses = []
 
         TestDataset = DataLoader(TestSet, shuffle=False, batch_size=1)
+        Num_Plot_Samples = min(Num_Plot_Samples, len(TestDataset))
 
         q_ini = np.random.random()
 
@@ -234,7 +241,8 @@ class EM_Pipeline(nn.Module):
                                               m= loader.num_samples, n=loader.num_samples )
 
 
-        self.ConsecutiveFilters = [KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma']) for _ in range(self.ssModel.m)]
+        self.ConsecutiveFilters = [KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma'], nResiduals=nResiduals)
+                                   for _ in range(self.ssModel.m)]
 
         self.SecondKalmanSmoother = KalmanSmoother(ssModel=self.ssModel, em_vars=self.em_parameters)
         self.SecondKalmanSmoother.InitSequence()
@@ -245,6 +253,9 @@ class EM_Pipeline(nn.Module):
         Initial_q_2 = np.random.random()
 
         loss_fn = torch.nn.MSELoss(reduction='mean')
+
+        timerSmoother = []
+        timerWhole = []
 
         self.Logger.SaveConfig({'EMSamples': DataSet_length,
                                 'EM_Parameters': self.em_parameters,
@@ -263,47 +274,42 @@ class EM_Pipeline(nn.Module):
 
             for n,(Heartbeat_Obs, Heartbeat_State) in enumerate(tqdm(TestDataset)):
 
-                if n == len(TestSet) -3:
+                # if n >= len(TestSet) - 8:
+                #
+                #     start = 100
+                #     end = 150
+                #     factor = 1.5
+                #     amplitudeFactor = 2
+                #     amplitudeAddition = 0.4
+                #
+                #     length = (end-start)
+                #     newStart = start - int(length*(factor-1)/2)
+                #     newEnd = end + int(length*(factor-1)/2)+1
+                #
+                #     noise = Heartbeat_Obs[:,:,newStart:newEnd,0]  - Heartbeat_State[:,:,newStart:newEnd,0]
+                #
+                #     if amplitudeFactor >0:
+                #         upsample = librosa.core.resample(Heartbeat_State[:,:,start:end,0].numpy(),length, length*factor)
+                #         distortion = (np.where(upsample < 0))
+                #         # distortion = amplitudeFactor
+                #         upsample[distortion] *= (1/amplitudeFactor)
+                #         upsample[not distortion] *= amplitudeFactor
+                #         distortionState = upsample
+                #     else:
+                #         distortionState = librosa.core.resample(Heartbeat_State[:, :, start:end, 0].numpy(), length,
+                #                                                 length * factor)  + amplitudeAddition
+                #
+                #
+                #     Heartbeat_Obs[:,:,newStart:newEnd,0] = torch.from_numpy(distortionState) + noise
+                #     Heartbeat_State[:, :, newStart:newEnd,0] = torch.from_numpy(distortionState)
+                #
+                #
+                #
+                #     TestSet.dataset.noisy_dataset[n] = Heartbeat_Obs
+                #     TestSet.dataset.centerd_data[n] = Heartbeat_State
 
-                    start = 100
-                    end = 150
-                    factor = 1.5
-                    amplitudeFactor = 1.3
-                    amplitudeAddition = 0
 
-                    length = (end-start)
-                    newStart = start - int(length*(factor-1)/2)
-                    newEnd = end + int(length*(factor-1)/2)+1
-
-                    noise = Heartbeat_Obs[:,:,newStart:newEnd,0]  - Heartbeat_State[:,:,newStart:newEnd,0]
-
-                    # distortionObs = librosa.core.resample(Heartbeat_Obs[:,:,start:end,0].numpy(),length,length*factor) * amplitudeFactor
-                    if amplitudeFactor >0:
-                        upsample = librosa.core.resample(Heartbeat_State[:,:,start:end,0].numpy(),length, length*factor)
-                        distortion = (np.where(upsample < 0))
-                        # distortion = amplitudeFactor
-                        upsample[distortion] *= (1/amplitudeFactor)
-                        upsample[not distortion] *= amplitudeFactor
-                        distortionState = upsample
-                    else:
-                        distortionState = librosa.core.resample(Heartbeat_State[:, :, start:end, 0].numpy(), length,
-                                                                length * factor)  + amplitudeAddition
-
-                    plt.plot(Heartbeat_State[0, 0, :, 0])
-                    plt.show()
-
-                    Heartbeat_Obs[:,:,newStart:newEnd,0] = torch.from_numpy(distortionState) + noise
-                    Heartbeat_State[:, :, newStart:newEnd,0] = torch.from_numpy(distortionState)
-
-
-                    plt.plot(Heartbeat_State[0,0,:,0])
-                    plt.show()
-
-                    TestSet.dataset.noisy_dataset[-3] = Heartbeat_Obs
-                    TestSet.dataset.centerd_data[-3] = Heartbeat_State
-                #     print('sada')
-
-                if n % EM_rep == 0:
+                if n == 0:
 
                     self.InitFilter(Heartbeat_Obs, Heartbeat_State)
 
@@ -313,9 +319,14 @@ class EM_Pipeline(nn.Module):
 
                     obs = self.KalmanSmoother.Smoothed_State_Means[0]
                 else:
+                    timerStart = time.time_ns()
 
                     self.KalmanSmoother.smooth(Heartbeat_Obs.squeeze(), T = self.ssModel.T)
+
+                    timeSmoother = time.time_ns()
                     obs = self.KalmanSmoother.Smoothed_State_Means
+                    # self.KalmanSmoother.emOnline(Heartbeat_Obs.squeeze(),self.ssModel.T,
+                    #                              self.smoothing_window_Q,self.smoothing_window_R)
 
 
                 self.SmoothedResults[n] = obs.squeeze()
@@ -336,30 +347,31 @@ class EM_Pipeline(nn.Module):
 
                     ConsecutiveFilter.UpdateRik(obs)
 
-                    if c==0 and (n == len(TestSet)-3  or n == len(TestSet)-4):
-                        plt.plot(torch.diag(ConsecutiveFilter.R))
-                        plt.show()
+
 
                     ConsecutiveFilter.UpdateOnline(obs)
 
 
                     self.FilteredResults[n,:,c] = ConsecutiveFilter.Filtered_State_Mean.squeeze()
 
+                if n % EM_rep != 0:
+                    timerEnd = time.time_ns()
+                    timerWhole.append(timerEnd-timerStart)
+                    timerSmoother.append(timeSmoother-timerStart)
 
             self.FilterLoss_dB = 10*torch.log10(loss_fn(self.FilteredResults,TestSet[:][1].squeeze()) )#/ loss_fn(torch.zeros_like(TestSet[:][1].squeeze()),TestSet[:][1].squeeze()))
             self.SmootherLoss_dB = 10*torch.log10(loss_fn(self.SmoothedResults,TestSet[:][1].squeeze()))#  / loss_fn(torch.zeros_like(TestSet[:][1].squeeze()),TestSet[:][1].squeeze()))
 
-            if self.wandb:
-                wandb.log({'FilteredLoss':self.FilterLoss_dB,
-                                 'SmoothedLoss': self.SmootherLoss_dB})
+            self.comulativeLosses.append(self.SmootherLoss_dB)
+            self.comulativeLosses.append(self.FilterLoss_dB)
 
             observations, states = TestSet[-Num_Plot_Samples:]
 
             observations = observations[..., channel].reshape(Num_Plot_Samples, -1, 1)
             states = states[..., channel].reshape(Num_Plot_Samples, -1, 1)
 
-            states = TestSet.dataset.centerd_data[-Num_Plot_Samples:][...,0].mT
-            observations = TestSet.dataset.noisy_dataset[-Num_Plot_Samples:][...,0].mT
+            states = TestSet.dataset.centerd_data[len(TestSet)-Num_Plot_Samples:len(TestSet)][...,0].mT
+            observations = TestSet.dataset.noisy_dataset[len(TestSet)-Num_Plot_Samples:len(TestSet)][...,0].mT
 
 
             results = [self.SmoothedResults[-Num_Plot_Samples:, :, channel],
@@ -367,8 +379,19 @@ class EM_Pipeline(nn.Module):
             labels = ['Smoothed states within HB', 'Filtered State consecutive HB']
 
             self.PlotResults(observations, states, results, labels)
+            inputSNR = 10*torch.log10(loss_fn(TestSet[:][1], TestSet[:][0]))
+
+            print('Input SNR: {}[dB]'.format(inputSNR.item()))
+
+            print('Output SNR: {}[dB]'.format((inputSNR-self.FilterLoss_dB).item()))
+
             print('Filtered Loss: {}[dB]'.format(self.FilterLoss_dB))
             print('Smoothed Loss: {}[dB]'.format(self.SmootherLoss_dB))
+
+            if self.wandb:
+                wandb.log({'FilteredLoss': self.FilterLoss_dB,
+                           'SmoothedLoss': self.SmootherLoss_dB,
+                           'Input SNR':inputSNR})
 
             return
 
@@ -386,7 +409,7 @@ class EM_Pipeline(nn.Module):
 
                     obs = self.KalmanSmoother.Smoothed_State_Means[0, :, channel]
                 else:
-
+                    timerStart = time.time_ns()
                     self.KalmanSmoother.smooth(Heartbeat_Obs.squeeze(), T=self.ssModel.T)
                     obs = self.KalmanSmoother.Smoothed_State_Means[:, :, channel]
 
@@ -404,6 +427,9 @@ class EM_Pipeline(nn.Module):
                         torch.diag_embed(self.KalmanSmoother.Smoothed_State_Covariances[0, :,  c, c]))
                     ConsecutiveFilter.UpdateOnline(obs)
                     ConsecutiveFilter.UpdateRik(obs)
+
+                if n % EM_rep != 0:
+                    timerEnd = time.time_ns()
 
             self.StichedConsectutivlyFiltered = Stich(torch.cat( [ConsecutiveFilter.Filtered_State_Means[0] for ConsecutiveFilter in self.ConsecutiveFilters],dim=-1), self.Overlaps[self.PriorLearnSetsize-1:])
 
@@ -461,14 +487,19 @@ class EM_Pipeline(nn.Module):
         nrows = 2
         ncols = 2
 
-        multi_figures = [plt.subplots(nrows=nrows,ncols=ncols, figsize = (16,9),dpi=120) for i in range(int(np.ceil(samples/(ncols*nrows))))]
+        legendFontSize = 15
+        ticksSize = 16
+        titleSize = 16
+        labelSize = 16
+
+        multi_figures = [plt.subplots(nrows=nrows,ncols=ncols, figsize = (16,9),dpi=120) for i in range(max(int(np.ceil(samples/(ncols*nrows))),1))]
         for fig,_ in multi_figures:
             fig.set_tight_layout(True)
             fig.suptitle('Filtered Signal Samples')
 
         channel = 0
 
-        distinguihable_color = ['#0075DC','#5EF1F2', '#00998F','#000075','#911eb4']
+        distinguihable_color = ['#fff017','#5EF1F2','#0075DC', '#00998F','#000075','#911eb4']
 
 
 
@@ -485,7 +516,12 @@ class EM_Pipeline(nn.Module):
 
             fig_multi ,ax_multi = multi_figures[int(j/(nrows * ncols))]
 
+
             current_axes = ax_multi[int(j%(nrows*ncols)/nrows), j % ncols]
+            current_axes.tick_params(labelsize = 8)
+            current_axes.xaxis.set_tick_params(labelsize=ticksSize)
+            current_axes.yaxis.set_tick_params(labelsize=ticksSize)
+
 
 
             if state != None:
@@ -507,23 +543,29 @@ class EM_Pipeline(nn.Module):
 
                 current_axes.plot(t,result[j].squeeze(), label = label, color = color)
 
-            ax_single.legend()
-            axSingleNoWindow.legend()
+            ax_single.legend(fontsize=1.5*legendFontSize)
+            axSingleNoWindow.legend(fontsize=1.5*legendFontSize)
 
-            current_axes.legend()
+            current_axes.legend(fontsize= 1.5*legendFontSize)
 
-            ax_single.set_xlabel('Time Steps')
-            axSingleNoWindow.set_xlabel('Time Steps')
+            ax_single.set_xlabel('Time Steps',fontsize = 1.5*labelSize)
+            ax_single.xaxis.set_tick_params(labelsize=1.5*ticksSize)
+            ax_single.yaxis.set_tick_params(labelsize=1.5*ticksSize)
 
-            current_axes.set_xlabel('Time Steps')
+            axSingleNoWindow.set_xlabel('Time Steps',fontsize = 1.5*labelSize)
+            axSingleNoWindow.xaxis.set_tick_params(labelsize=1.5*ticksSize)
+            axSingleNoWindow.yaxis.set_tick_params(labelsize=1.5*ticksSize)
 
-            ax_single.set_ylabel('Amplitude [mV]')
-            axSingleNoWindow.set_ylabel('Amplitude [mV]')
 
-            current_axes.set_ylabel('Amplitude [mV]')
+            current_axes.set_xlabel('Time Steps',fontsize = 1.5*labelSize)
 
-            ax_single.set_title('Filtered Signal Sample')
-            axSingleNoWindow.set_title('Filtered Signal Sample')
+            ax_single.set_ylabel('Amplitude [mV]',fontsize = 1.5*labelSize)
+            axSingleNoWindow.set_ylabel('Amplitude [mV]',fontsize = 1.5*labelSize)
+
+            current_axes.set_ylabel('Amplitude [mV]',fontsize = 1.5*labelSize)
+
+            # ax_single.set_title('Filtered Signal Sample',fontsize = 1.5*titleSize)
+            axSingleNoWindow.set_title('Filtered Signal Sample',fontsize = 1.5*titleSize)
 
 
 
@@ -573,19 +615,34 @@ class EM_Pipeline(nn.Module):
             fig_multi.show()
 
         # Plot multiple HBs
-
         consecutive_beats = min(10, samples)
 
         StackedObservations = Stich(observations[-consecutive_beats:], self.Overlaps[-consecutive_beats:])
 
         if stateFlag:
             StackedStates = Stich(states[-consecutive_beats:], self.Overlaps[-consecutive_beats:])
+            stackedYMin = torch.min(StackedStates)
+            stackedYMax = torch.max(StackedStates)
+        else:
+            stackedYMin = torch.inf
+            stackedYMax = -torch.inf
 
         Stackedresults = []
+
+        smallestResultYAxis = torch.inf
+        biggestResultYAxis = -torch.inf
         for result in results:
             Stackedresults.append(Stich(result[-consecutive_beats:], self.Overlaps[-consecutive_beats:]))
+            yStackedMinResults = torch.min(result)
+            yStackedMaxResults = torch.max(result)
+            if yStackedMinResults < smallestResultYAxis:
+                smallestResultYAxis = yStackedMinResults
+            if yStackedMaxResults > biggestResultYAxis:
+                biggestResultYAxis = yStackedMaxResults
 
         t_cons = np.arange(start=0, stop=consecutive_beats, step= consecutive_beats / len(StackedObservations))
+        yAxisMin = min(stackedYMin.item(), smallestResultYAxis.item())
+        yAxisMax = max(stackedYMax.item(), biggestResultYAxis.item())
 
 
 
@@ -596,26 +653,34 @@ class EM_Pipeline(nn.Module):
 
         ax_cons[0].plot(t_cons,StackedObservations.squeeze(), label = 'Observations', color = 'r', alpha = 0.4)
 
-        ax_cons[0].set_xlabel('Time [s]')
-        ax_cons[0].set_ylabel('Amplitude [mV]')
+        ax_cons[0].set_xlabel('Time [s]',fontsize = labelSize)
+        ax_cons[0].set_ylabel('Amplitude [mV]',fontsize = labelSize)
         title_cons = 'Observations'
-        ax_cons[0].set_title(title_cons)
+        ax_cons[0].set_title(title_cons,fontsize = titleSize)
+        ax_cons[0].xaxis.set_tick_params(labelsize=ticksSize)
+        ax_cons[0].yaxis.set_tick_params(labelsize=ticksSize)
 
         if stateFlag:
             ax_cons[1].plot(t_cons,StackedStates.squeeze(), label = 'Ground Truth', color = 'g')
 
-            ax_cons[1].set_xlabel('Time [s]')
-            ax_cons[1].set_ylabel('Amplitude [mV]')
+            ax_cons[1].set_xlabel('Time [s]',fontsize = labelSize)
+            ax_cons[1].set_ylabel('Amplitude [mV]',fontsize = labelSize)
             title_cons = 'Ground Truth'
-            ax_cons[1].set_title(title_cons)
+            ax_cons[1].set_title(title_cons,fontsize = titleSize)
+            ax_cons[1].xaxis.set_tick_params(labelsize=ticksSize)
+            ax_cons[1].yaxis.set_tick_params(labelsize=ticksSize)
+            ax_cons[1].set_ylim([yAxisMin, yAxisMax])
 
         for j,(result, label) in enumerate(zip(Stackedresults, labels)):
             # color = (max(0, j - 1) * 0.5 ** (j - 2), max(0, j) * 0.5 ** (j - 1), max(0, j + 1) * 0.5 ** j)
             color = distinguihable_color[j]
             ax_cons[j+num_signal].plot(t_cons,result.squeeze(), color = color)
-            ax_cons[j+num_signal].set_title(label)
-            ax_cons[j+num_signal].set_xlabel('Time [s]')
-            ax_cons[j+num_signal].set_ylabel('Amplitude [mV]')
+            ax_cons[j+num_signal].set_title(label,fontsize = titleSize)
+            ax_cons[j+num_signal].set_xlabel('Time [s]',fontsize = labelSize)
+            ax_cons[j+num_signal].set_ylabel('Amplitude [mV]',fontsize = labelSize)
+            ax_cons[j+num_signal].xaxis.set_tick_params(labelsize=ticksSize)
+            ax_cons[j+num_signal].yaxis.set_tick_params(labelsize=ticksSize)
+            ax_cons[j+num_signal].set_ylim([yAxisMin, yAxisMax])
 
         fig_con.savefig(self.Logger.GetLocalSaveName('Sample_Plots',prefix= f'{prefix}Cons_'))
 
@@ -623,6 +688,8 @@ class EM_Pipeline(nn.Module):
             pass
         else:
             fig_con.show()
+
+        1
 
 
 
@@ -756,54 +823,18 @@ class Rik_Pipeline(EM_Pipeline):
 
     def FitPrior(self, PriorSet: Dataset):
 
-        Data = DataLoader(PriorSet, batch_size= len(PriorSet))
-        # obs,states = next(iter(Data))
 
-        obs, states = next(iter(Data))
-
-        self.ObservationCovariace = []
-
-        for channel in range(obs.shape[-1]):
-
-            Y_minus_i = torch.cat((obs[...,:channel],obs[...,channel+1:]),dim=-1).squeeze()
-            y = obs[...,channel].squeeze()
-
-            gamma = torch.linalg.pinv(Y_minus_i.mT.bmm(Y_minus_i)).bmm( Y_minus_i.mT).bmm(y.unsqueeze(-1))
-
-            w = y.unsqueeze(-1) - Y_minus_i.bmm(gamma)
-
-            self.ObservationCovariace.append(w.std())
-
-        self.PriorLearnSetsize = len(PriorSet)
-        try:
-            observations, _ = next(iter(DataLoader(PriorSet, batch_size=len(PriorSet))))
-            self.PriorModel.fit(observations.squeeze().mT)
-            self.ssModel = self.PriorModel.GetSysModel()
-        except ValueError:
-            observations = next(iter(DataLoader(PriorSet, batch_size=len(PriorSet))))
-            self.PriorModel.fit(observations.squeeze().mT)
-            self.ssModel = self.PriorModel.GetSysModel()
-        except NotImplementedError:
-
-            self.ssModel = SystemModel(f='Identity', q=1, h='Identity', r=1,
-                                       T=PriorSet.dataset.T, T_test=PriorSet.dataset.T,
-                                       m=PriorSet.dataset.m, n=PriorSet.dataset.n)
-
-        self.ssModel.InitSequence(torch.zeros((self.ssModel.m, 1)), torch.eye(self.ssModel.m))
-
-        self.KalmanSmoother = KalmanSmoother(ssModel=self.ssModel, em_vars=self.em_parameters)
-        self.KalmanSmoother.InitSequence()
-
-        self.ssModel.GenerateSequence(self.ssModel.T)
+        self.ObservationCovariace =  self.PriorModel.fit(PriorSet)
 
 
 
+        # self.ssModel.InitSequence(torch.zeros((self.ssModel.m, 1)), torch.eye(self.ssModel.m))
 
-        # self.ObservationCovariave = obs.std()
 
 
     def Run(self, Data: Dataset,PriorSamples:int = 100 , em_its:int = 10,
-            Num_Plot_Samples:int = 10,ConvergenceThreshold:float = 1e-5, EM_rep = None):
+            Num_Plot_Samples:int = 10,ConvergenceThreshold:float = 1e-5, EM_rep = None,
+            nResiduals = 1):
 
         try:
 
@@ -822,7 +853,7 @@ class Rik_Pipeline(EM_Pipeline):
 
             self.FitPrior(PriorDataset)
 
-            self.FilterConsecutive(TestDataset, Num_Plot_Samples)
+            self.FilterConsecutive(TestDataset, Num_Plot_Samples, nResiduals)
 
             self.save()
 
@@ -831,7 +862,7 @@ class Rik_Pipeline(EM_Pipeline):
             raise
 
 
-    def FilterConsecutive(self,TestDataset,Num_Plot_Samples = 10):
+    def FilterConsecutive(self,TestDataset,Num_Plot_Samples = 10, nResiduals = 1):
 
         TestLoader = DataLoader(TestDataset, batch_size=1)
 
@@ -850,16 +881,20 @@ class Rik_Pipeline(EM_Pipeline):
 
         self.Overlaps = TestDataset.dataset.Overlap
 
+        timer = []
+
         for ConsecutiveSSModel in self.ConsecutiveSSModels:
             ConsecutiveSSModel.InitSequence()
 
-        self.ConsecutiveFilters = [KalmanFilter(ConsecutiveSSModel, DiagonalMatrices= ['F','H','R','Q','Sigma']) for ConsecutiveSSModel in self.ConsecutiveSSModels]
+        self.ConsecutiveFilters = [KalmanFilter(ConsecutiveSSModel, DiagonalMatrices= ['F','H','R','Q','Sigma'],nResiduals=nResiduals) for ConsecutiveSSModel in self.ConsecutiveSSModels]
 
         for ConsecutiveFilter in self.ConsecutiveFilters:
             ConsecutiveFilter.InitSequence()
             ConsecutiveFilter.InitOnline(len(TestLoader))
 
         for j, (observation, state) in enumerate(TestLoader):
+
+            timeStart = time.time_ns()
 
             for channel in range(channels):
 
@@ -869,6 +904,9 @@ class Rik_Pipeline(EM_Pipeline):
 
                 self.FilteredStates[j,:,channel] = self.ConsecutiveFilters[channel].Filtered_State_Mean.squeeze()
 
+            timerEnd = time.time_ns()
+
+            timer.append(timerEnd-timeStart)
 
         loss_fn = torch.nn.MSELoss(reduction = 'mean')
 
@@ -876,8 +914,7 @@ class Rik_Pipeline(EM_Pipeline):
         loss = loss_fn(TestDataset[:][1], self.FilteredStates)
 
         self.FilterLoss_dB =(
-            loss_fn(self.FilteredStates, TestDataset[:][1].squeeze()) / loss_fn(torch.zeros_like(TestDataset[:][1].squeeze()),
-                                                                             TestDataset[:][1].squeeze()))
+            loss_fn(self.FilteredStates, TestDataset[:][1].squeeze()) )
 
 
         print(f'Loss {10*torch.log10(self.FilterLoss_dB)}[dB]')
@@ -973,20 +1010,16 @@ class ReducedSystem(SystemModel):
 
 class AE_Pipeline(EM_Pipeline):
 
-    def __init__(self,dummy,Logger, em_parameters,
-                                                 Mode, AdditionalLogs = {}, smoothing_window_Q=0,smoothing_window_R=0):
+    def __init__(self,dummy,Logger, em_parameters,Mode, AdditionalLogs = {},
+                 smoothing_window_Q=0,smoothing_window_R=0):
 
         from NNs.AutoEncoder import AutoEncoder
         from SystemModels.Extended_sysmdl import SystemModel
 
+        # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_13___11_44\Logs\Models\Models.pt")
 
+        PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_10_03___23_10\Logs\Models\Models.pt")
 
-        # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_11___21_42\Logs\Models\Models.pt")
-        # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_13___09_01\Logs\Models\Models.pt")
-
-        # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_13___09_11\Logs\Models\Models.pt")
-
-        PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_13___11_44\Logs\Models\Models.pt")
 
         super(AE_Pipeline, self).__init__(PriorModel, Logger, em_parameters,
                                                  Mode, AdditionalLogs)
@@ -1016,11 +1049,14 @@ class AE_Pipeline(EM_Pipeline):
     def PlotPrior(self):
         pass
 
-    def ConsecutiveEM(self, TestSet, em_its,  Num_Plot_Samples, ConvergenceThreshold, EM_rep ):
+    def ConsecutiveEM(self, TestSet, em_its,  Num_Plot_Samples, ConvergenceThreshold, EM_rep,**kwargs ):
 
         self.Overlaps = TestSet.dataset.Overlap
 
-        self.EM_Data = TestSet
+        nResiduals = kwargs['nResiduals'] if 'nResiduals' in kwargs.keys() else 1
+
+
+        # self.EM_Data = TestSet
 
         channel = 0
 
@@ -1047,7 +1083,8 @@ class AE_Pipeline(EM_Pipeline):
                                               m= loader.num_samples, n=loader.num_samples )
 
 
-        self.ConsecutiveFilters = [KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma']) for _ in range(self.ssModel.m)]
+        self.ConsecutiveFilters = [KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma'],
+                                                nResiduals= nResiduals) for _ in range(self.ssModel.m)]
 
         # self.ConsecutiveFilter = KalmanFilter(self.ConsecutiveSSModel, DiagonalMatrices=['F','H','Q','R','Sigma'])
 
@@ -1072,18 +1109,23 @@ class AE_Pipeline(EM_Pipeline):
             ConsecutiveFilter.InitSequence(torch.zeros((self.ssModel.T, 1)), torch.eye(ConsecutiveFilter.m))
             ConsecutiveFilter.InitOnline(DataSet_length)
 
+        timerInference = []
+        timerKF = []
 
 
         for n,(Heartbeat_Obs, Heartbeat_State) in enumerate(tqdm(TestDataset)):
 
-            if n == len(TestSet) - 3:
-                Heartbeat_Obs[:, :, 30:50] += 0.5
-                Heartbeat_State[:, :, 30:50] += 0.5
-
+            # if n == len(TestSet) - 3:
+            #     Heartbeat_Obs[:, :, 30:50] += 0.5
+            #     Heartbeat_State[:, :, 30:50] += 0.5
+            #
 
             with torch.no_grad():
-
+                timerStartinferenece = time.time_ns()
                 NN_inference = self.ssModel.NN(Heartbeat_Obs.to(self.ssModel.NN.dev)).squeeze().cpu()
+                timerEndinference = time.time_ns()
+
+                timerInference.append(timerEndinference-timerStartinferenece)
 
             self.NNResults[n] = NN_inference
 
@@ -1111,6 +1153,8 @@ class AE_Pipeline(EM_Pipeline):
 
             for c, ConsecutiveFilter in enumerate(self.ConsecutiveFilters):
 
+
+
                 # if n % EM_rep == 0:
                 #     obs = self.KalmanSmoother.Smoothed_State_Means[0, :, c]
                 # else:
@@ -1118,16 +1162,16 @@ class AE_Pipeline(EM_Pipeline):
 
                 obs = NN_inference[...,c].reshape(-1,1)
 
-                Y_minus_i = torch.cat((NN_inference[..., :c], NN_inference[..., c + 1:]), dim=-1).squeeze()
-                y = NN_inference[..., c].squeeze()
+                # Y_minus_i = torch.cat((NN_inference[..., :c], NN_inference[..., c + 1:]), dim=-1).squeeze()
+                # y = NN_inference[..., c].squeeze()
+                #
+                # gamma = torch.linalg.pinv(Y_minus_i.T.mm(Y_minus_i)).mm(Y_minus_i.T).mm(y.unsqueeze(-1))
+                #
+                # w = y.unsqueeze(-1) - Y_minus_i.mm(gamma)
+                #
+                # var = w.var()
 
-                gamma = torch.linalg.pinv(Y_minus_i.T.mm(Y_minus_i)).mm(Y_minus_i.T).mm(y.unsqueeze(-1))
-
-                w = y.unsqueeze(-1) - Y_minus_i.mm(gamma)
-
-                var = w.var()
-
-                # var = (obs - Heartbeat_State).var()
+                var = (obs - Heartbeat_State).var()
 
                 # ConsecutiveFilter.UpdateR(
                 #     torch.diag_embed(self.KalmanSmoother.Smoothed_State_Covariances[0, :, c, c]))
@@ -1141,6 +1185,8 @@ class AE_Pipeline(EM_Pipeline):
 
                 self.FilteredResults[n,:,c] = ConsecutiveFilter.Filtered_State_Mean.squeeze()
 
+            timerEndKf = time.time_ns()
+            timerKF.append(timerEndKf-timerStartinferenece)
 
 
 
@@ -1150,11 +1196,9 @@ class AE_Pipeline(EM_Pipeline):
 
         observations, states = TestSet[-Num_Plot_Samples:]
         observations = observations[..., channel].reshape(Num_Plot_Samples, -1, 1)
-        observations[-3, 30:50] += 0.5
 
         states = states[..., channel].reshape(Num_Plot_Samples, -1, 1)
 
-        states[-3, 30:50] += 0.5
         results = [self.NNResults[-Num_Plot_Samples:,:,channel],
                    self.ConsecutiveFilters[channel].Filtered_State_Means[0, -Num_Plot_Samples:]
                    ]

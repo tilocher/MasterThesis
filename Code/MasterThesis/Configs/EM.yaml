@@ -1,18 +1,19 @@
 # Data Parameters:
 snr: 0 # in [dB]
 signal_length: 360 # Timesteps in an ecg signal
-preprocess: False
+preprocess: True
 smoothing_window_Q: -1
 smoothing_window_R: -1
+noiseColor: 0
 
 # Computation and logging parameters
 gpu: False # Whether we want to try to use a gpu or not
 wandb: False
-wandbGroup: 'EM_Algorithm'
+wandbGroup: 'EM_Algorithm_PriorSamples'
 
 # EM parameters
 EM_Its: 50
-EM_vars: [Mu,Sigma,Q,R,F]
+EM_vars: [Mu,Sigma,Q,R]
 ConvergenceThreshold: 1.0e-6
 EM_rep: 1000
 Num_Plot_Samples: 10
@@ -20,6 +21,7 @@ Num_Plot_Samples: 10
 # How to run the algorithm can be one of:
 # 'All', 'Segmented', 'Consecutive'
 Mode: 'Consecutive'
+nResiduals: 5
 
 # How EM fits the data, can be one of:
 # 'Taylor', 'Prior', 'Identity', 'Rik','Synthetic', 'AE','Arima'
@@ -28,8 +30,8 @@ PriorSamples: 20
 
 # Prior Model parameters
 Parameters:
-  Window: 'rectangular'
-  WindowSize: 7
-  WindowParameter: 0.7
+  window: 'rectangular'
+  windowSize: 1
+  windowParameter: 1
   TaylorOrder: 5
   channels: 2

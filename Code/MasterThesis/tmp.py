@@ -6,21 +6,40 @@ from DataLoaders.PhysioNetLoader import PhyioNetLoader_MIT_NIH
 import pandas
 
 if __name__ == '__main__':
-    fig = plt.figure(frameon=False, dpi = 200)
+
+    fig,ax = plt.subplots(2,1, dpi = 400, frameon = False)
+    # fig = plt.figure(frameon=False, dpi = 400)
     # fig.set_size_inches(10, )
     markersize = 20
 
-    loader = PhyioNetLoader_MIT_NIH(1,1,360,0,gpu=False,plot_sample=False)
+    loader = PhyioNetLoader_MIT_NIH(1,1,360,10,gpu=False,plot_sample=False)
 
-    sample = loader.centerd_data[0]
+    sample = loader.centerd_data[:1,0,:].reshape(1,-1)
+    noisy_sample = loader.noisy_dataset[:1,0,:].reshape(1,-1)
+    #
+    # sample = noisy_sample
     # t = np.arange(start=0, stop=sample_signal.shape[0] / (self.fs), step=1 / (self.fs))
 
     # ax = plt.Axes(fig, [0., 0., 1., 1.])
 
     # ax = plt.axes(projection = '3d')
-    ax = plt.axes()
-    ax.set_axis_off()
-    fig.add_axes(ax)
+    # ax = plt.axes()
+    y = torch.linspace(0,1,sample.shape[-1])
+    x = torch.zeros_like(y)
+    markersize = 7
+    lower = int(360/2) - 20
+    upper = int(360/2) + 20
+    ax[0].plot(y[lower:upper],sample[0][lower:upper],'o--', markersize = markersize, color = 'g',linewidth = 1)
+    ax[1].plot(y[lower:upper],noisy_sample[0][lower:upper],'o--', markersize = markersize, color = 'r',linewidth = 1, alpha = 1)
+    # fig.axes[0].set_visible(False)
+    fig.axes[0].axis('off')
+    fig.axes[0].get_xaxis().set_visible(False)
+    fig.axes[0].get_yaxis().set_visible(False)
+    fig.axes[1].axis('off')
+    fig.axes[1].get_xaxis().set_visible(False)
+    fig.axes[1].get_yaxis().set_visible(False)
+    # ax.set_axis_off()
+    # fig.add_axes(ax)
     # plt.plot(0,1,'*',color = '#FF3333',markersize = markersize)
     # plt.plot(-0.1, 0.5, '*', color='#CC99FF',markersize = markersize)
     # plt.plot(0.11, 0.5, '*', color='#CC99FF',markersize = markersize)
@@ -28,11 +47,16 @@ if __name__ == '__main__':
     # plt.plot(0.2, 0.1, '*', color='#FF99CC',markersize = markersize)
     # plt.xlim([-0.4,0.4])
 
-
-    y = torch.linspace(0,1,sample.shape[-1])
-    x = torch.zeros_like(y)
-
-    plt.plot(y,sample[0])
+    # ax[0].vlines(360 / (len(y)), -1, 1, 'b', '--')
+    # ax[0].vlines(720 / len(y), -1, 1, 'b', '--')
+    # ax[0].vlines(0 / (len(y)), -1, 1, 'b', '--')
+    # ax[0].vlines(len(y) / len(y), -1, 1, 'b', '--')
+    #
+    #
+    # ax[1].vlines(360/(len(y)), -1,1, 'b','--')
+    # ax[1].vlines(720 / len(y), -1, 1, 'b', '--')
+    # ax[1].vlines(0 / (len(y)), -1, 1, 'b', '--')
+    # ax[1].vlines(len(y) / len(y), -1, 1, 'b', '--')
 
     # x = np.sin(t)
     # y = np.cos(t)
@@ -50,7 +74,7 @@ if __name__ == '__main__':
 
     # plt.xlabel('Time [s]')
     # plt.ylabel('Amplitude [V]')
-    plt.savefig('one_beat.svg',transparent = True)
+    plt.savefig('one_beat_both_zoomed.svg',transparent = True)
 
     plt.show()
     def conv(x):

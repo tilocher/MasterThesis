@@ -11,8 +11,6 @@ from PriorModels.BasePrior import BasePrior
 
 
 
-
-
 class TaylorPrior(BasePrior):
 
     def __init__(self,**kwargs):
