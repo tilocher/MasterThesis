@@ -34,4 +34,4 @@ Parameters:
   windowSize: 1
   windowParameter: 1
   TaylorOrder: 5
-  channels: 2
+  channels: 12

@@ -202,7 +202,7 @@ class KalmanFilter():
         self.Filtered_State_Covariance = self.Predicted_State_Covariance - self.Filtered_State_Covariance
 
         self.Filtered_Residual = self.Observation - torch.bmm(self.H, self.Filtered_State_Mean)
-
+    @torch.no_grad()
     def filter(self, observations, T):
 
         with torch.no_grad():
@@ -414,7 +414,7 @@ class KalmanSmoother(KalmanFilter):
                                                        (
                                                                    self.Smoothed_State_Covariance - self.Predicted_State_Covariance),
                                                        self.SG.mT))
-
+    @torch.no_grad()
     def smooth(self, observations, T):
         import time
         start = time.time_ns()
@@ -445,7 +445,7 @@ class KalmanSmoother(KalmanFilter):
             self.SGains[:, t] = self.SG
 
         stop = time.time_ns()
-        print('dsf')
+        # print('dsf')
 
 
     def SmoothPair(self, T):

@@ -52,8 +52,8 @@ if __name__ == '__main__':
 
         priorModel = eval(f'PriorModels.{prior}Prior(**priorParams)')
 
-        loader = PhyioNetLoader_MIT_NIH(1, 1, signal_length, SNR_dB=snr, random_sample=False, gpu=False,
-                                        plot_sample=False, desired_shape=(1, signal_length, 2), roll=0, offset= 0)
+        # loader = PhyioNetLoader_MIT_NIH(1, 1, signal_length, SNR_dB=snr, random_sample=False, gpu=False,
+        #                                 plot_sample=False, desired_shape=(1, signal_length, 2), roll=0, offset= 0)
         # loader = PhyioNetLoader_MIT_BIH_Normal(1, 1, signal_length, SNR_dB=snr, random_sample=False, gpu=False,
         #                                 plot_sample=False, desired_shape=(1, signal_length, 2), roll=0,offset = 1)
         signal_length_ratio = 0.5
@@ -62,9 +62,9 @@ if __name__ == '__main__':
         lossesfiltered = []
         # for i in range(30):
         #
-        # loader = RikDataset(desired_shape=(1, int(signal_length_ratio*500), 12),gpu = config['gpu'],
-        #                     preprocess=config['preprocess'], snr_dB= snr, offset= 0, signal_length_ratio=signal_length_ratio,
-        #                     noiseColor= noisecolor, num_files= 1)
+        loader = RikDataset(desired_shape=(1, int(signal_length_ratio*500), 12),gpu = config['gpu'],
+                            preprocess=config['preprocess'], snr_dB= snr, offset= 0, signal_length_ratio=signal_length_ratio,
+                            noiseColor= noisecolor, num_files= 1)
 
 
 

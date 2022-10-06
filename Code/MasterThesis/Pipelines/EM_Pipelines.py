@@ -1016,9 +1016,14 @@ class AE_Pipeline(EM_Pipeline):
         from NNs.AutoEncoder import AutoEncoder
         from SystemModels.Extended_sysmdl import SystemModel
 
+        # Rik -6
         # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_09_13___11_44\Logs\Models\Models.pt")
 
-        PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_10_03___23_10\Logs\Models\Models.pt")
+        # Rik 0
+        PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_10_05___22_16\Logs\Models\Models.pt")
+
+        # PhysioNet
+        # PriorModel = torch.load(r"E:\MasterThesis\log\runs\AutoEncoder\22_10_03___23_10\Logs\Models\Models.pt")
 
 
         super(AE_Pipeline, self).__init__(PriorModel, Logger, em_parameters,
@@ -1228,7 +1233,6 @@ class Arima_Pipeline(EM_Pipeline):
     #
     #
     #     super(Arima_Pipeline, self).__init__(PriorModel,Logger,em_parameters,Mode,AdditionalLogs,smoothing_window_Q,smoothing_window_R)
-
 
 
 

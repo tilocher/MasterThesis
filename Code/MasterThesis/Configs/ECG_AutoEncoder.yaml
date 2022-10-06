@@ -14,7 +14,7 @@ Segmented: False
 
 # NN Parameters
 LatentSpace: 25
-Epochs: 1000
+Epochs: 100
 L2: 1.0e-6
 lr: 1.0e-3
 BatchSize: 32

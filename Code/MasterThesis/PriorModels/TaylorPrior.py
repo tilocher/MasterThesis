@@ -216,6 +216,7 @@ class TaylorPrior(BasePrior):
         t = t + self.offset
         return (x.squeeze() + (self.basis_functions.T @ self.coefficients[...,t] ).squeeze()).unsqueeze(-1)
 
+
     @property
     def gradients(self):
         basis_functions = self.basis_functions.reshape((1,-1,1))
@@ -235,8 +236,6 @@ class TaylorPrior(BasePrior):
         return torch.eye(self.channels)
 
     def getSysModel(self,timesteps = None, offset = 0, gpu = False):
-
-
         self.offset = offset
 
         if timesteps == None:
@@ -256,9 +255,9 @@ class TaylorPrior(BasePrior):
         self.ssModel.setFJac(self.FJacobian)
         self.ssModel.setHJac(self.HJacobian)
 
-
-
         return self.ssModel
+
+
 
     def Identity(self, x, t):
         return x
